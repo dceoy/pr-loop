@@ -133,9 +133,9 @@ For each round:
 7. Fetch the complete current PR feedback and dispatch `feedback-analysis` on the unchanged head.
 8. Before acting, re-read the head and feedback. If the head changed, restart the review round. If feedback changed materially while the head did not, rerun feedback analysis on the fresh feedback before mutating anything.
 9. Validate the dispositions. If any item requires `clarify`, stop and ask only for the missing material decision. If an unresolved `defer`, `wont-fix`, permission failure, or other blocker prevents a clean terminal state, stop and report it.
-10. Implement all accepted `fix` dispositions coherently in the top-level agent and run repository QA.
-11. Before committing/pushing a fix, verify that the remote PR head is still the SHA analyzed in this round. If not, do not push stale work; reconcile with the new head first.
-12. Commit and push the verified fixes unless an execution constraint forbids it. Verify the PR now points to the expected new head.
+10. Before editing, establish a safe local worktree for the exact recorded PR head repository/ref and analyzed SHA. Do not mix unrelated tracked, staged, untracked, or unpushed work into the fix. Fetch the recorded head ref, check out or switch to a local branch that corresponds to that exact PR head and will push explicitly to that recorded head ref, and require local `HEAD` to equal the analyzed SHA. If the worktree cannot be aligned safely, stop instead of editing. Then implement all accepted `fix` dispositions coherently in the top-level agent and run repository QA.
+11. Before committing/pushing a fix, verify that both local `HEAD` and the remote PR head are still the SHA analyzed in this round. If not, do not commit or push stale work; reconcile with the new head first.
+12. Commit and push the verified fixes explicitly to the recorded PR head repository/ref unless an execution constraint forbids it. Verify the PR now points to the expected new head.
 13. Reply to and resolve feedback only when the corresponding disposition is terminal and any required code fix is present on the verified PR head. Leave unresolved items open.
 14. If the PR head changed because of the fixes, start a new review round on that new head.
 15. If the head stayed unchanged, refresh feedback once more. Finish only when that exact head has completed review and no actionable feedback or unresolved blocking reviewer state remains.
