@@ -39,19 +39,21 @@ jobs:
             echo "::error::${skill_file} does not declare 'name: ${name}'"
             exit_status=1
           fi
-          for discovery_root in .agents/skills .claude/skills; do
-            link="${discovery_root}/${name}"
-            if [ ! -L "${link}" ]; then
-              echo "::error::${link} is not a symlink"
-              exit_status=1
-              continue
-            fi
-            target="$(readlink "${link}")"
-            if [ "${target}" != "../../skills/${name}" ]; then
-              echo "::error::${link} -> ${target}, expected ../../skills/${name}"
-              exit_status=1
-            fi
-          done
+
+          agents_link=".agents/skills/${name}"
+          if [ ! -L "${agents_link}" ] || [ "$(readlink "${agents_link}")" != "../../skills/${name}" ]; then
+            echo "::error::${agents_link} must link to ../../skills/${name}"
+            exit_status=1
+          fi
+
+          if [ ! -L .claude/skills ] || [ "$(readlink .claude/skills)" != "../skills" ]; then
+            echo "::error::.claude/skills must link to ../skills"
+            exit_status=1
+          elif [ ! -f ".claude/skills/${name}/SKILL.md" ]; then
+            echo "::error::.claude/skills does not expose ${name}"
+            exit_status=1
+          fi
+
           exit "${exit_status}"
   github-actions-lint-and-scan:
     permissions:

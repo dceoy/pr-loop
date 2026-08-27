@@ -14,6 +14,8 @@ For every advisory phase, the top-level agent uses the active runtime's native s
 
 Subagents are read-only advisors. The top-level agent alone edits files, runs write-mode tools, commits, pushes, opens or updates pull requests, posts review feedback, and resolves threads.
 
+The repository includes the `.codex` and `.claude` agent configuration from `dceoy/ai-coding-agent-skills`. Codex therefore has project definitions for `planner`, `reviewer`, `feedback-analyst`, and `advisor`; compatible user-defined roles are preferred by `pr-loop` before built-in fallback agents.
+
 ## Workflow
 
 - **Issue-started work:** planning subagent → main-agent implementation/QA → pull request → review loop.
@@ -24,9 +26,8 @@ The review phase uses independent lenses for correctness, tests/docs, and securi
 
 ## Discovery
 
-- Codex-compatible agent runtimes discover the skill at `.agents/skills/pr-loop`.
-- Claude Code discovers the skill at `.claude/skills/pr-loop`.
-- Both are local symlinks to [`skills/pr-loop`](skills/pr-loop).
+- Codex-compatible agent runtimes discover the skill at `.agents/skills/pr-loop`, a symlink to `../../skills/pr-loop`.
+- Claude Code uses `.claude/skills -> ../skills`, exposing the canonical `skills/pr-loop` directory.
 
 ## Requirements
 
