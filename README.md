@@ -50,4 +50,4 @@ See [`skills/pr-loop/SKILL.md`](skills/pr-loop/SKILL.md) for the normative workf
 
 ## Background
 
-`pr-loop` is a native-subagent rewrite of the former `oracle-pr-loop` workflow, without Oracle, browser automation, fixed-model, or coding-agent CLI dependencies.
+`pr-loop` is a native-subagent rewrite of the former [`oracle-pr-loop`](https://github.com/dceoy/oracle-pr-loop) workflow, without Oracle, browser automation, fixed-model, or coding-agent CLI dependencies.
