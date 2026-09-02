@@ -1,41 +1,53 @@
 # pr-loop
 
-`pr-loop` is an agent skill for carrying GitHub work through implementation, pull-request review, fixes, and re-review until no actionable feedback remains.
+> GitHub-native, race-safe Agentic Issue-Driven Development orchestrator.
 
-It is a native-subagent rewrite of the former `oracle-pr-loop` workflow. It has no Oracle, browser automation, ChatGPT GitHub-app, fixed-model, or coding-agent CLI dependency.
+`pr-loop` turns GitHub Issues into reviewed pull requests and drives existing pull requests through review, fixes, and re-review until no actionable feedback or reviewer-blocked state remains.
+
+It uses a single-writer multi-agent model: fresh native subagents plan, review, and analyze feedback, while the top-level agent alone mutates the repository and GitHub state.
+
+## How it works
+
+```mermaid
+flowchart LR
+  I[Issue] --> P[Plan] --> M[Implement + QA] --> PR[Pull request]
+  PR --> R[Review exact head] --> F[Reconcile feedback] --> X[Fix + QA]
+  X --> R
+  F -->|terminal| S[Success]
+```
+
+For an existing pull request, the loop starts at review.
+
+Reviews use independent lenses for correctness, tests/docs, and security/performance. Feedback is classified into concrete dispositions such as `fix`, `already addressed`, `outdated`, `answer`, `clarify`, `defer`, or `won't fix`.
+
+## Race-safety
+
+- **Single writer:** only the top-level agent edits, commits, pushes, publishes reviews, replies, or resolves threads.
+- **Exact-head review:** every review and feedback decision is bound to one PR head SHA; stale results are discarded when the head moves.
+- **Stable feedback:** feedback is snapshotted and re-analyzed when external comments, reviews, or threads change.
+- **Fresh advisors:** planning, review, and feedback analysis run in independent read-only subagents with fresh context.
+- **Fail closed:** the loop stops on ambiguous state, unsafe worktrees, unavailable required subagents, failed QA, or unresolved blocking reviewer state.
+
+Success requires the final exact head to have a verified review, reconciled feedback, and no actionable or reviewer-blocked item remaining.
 
 ## Agent routing
 
-For every advisory phase, the top-level agent uses the active runtime's native subagent mechanism:
-
-1. Prefer an eligible user-defined agent whose declared purpose matches the role.
-2. If none is available, use a suitable built-in agent.
-3. If the runtime exposes no independent subagent capability, stop rather than silently doing the advisory work in the main context.
-
-Subagents are read-only advisors. The top-level agent alone edits files, runs write-mode tools, commits, pushes, opens or updates pull requests, posts review feedback, and resolves threads.
-
-The repository includes the `.codex` and `.claude` agent configuration from `dceoy/ai-coding-agent-skills`. Codex therefore has project definitions for `planner`, `reviewer`, `feedback-analyst`, and `advisor`; compatible user-defined roles are preferred by `pr-loop` before built-in fallback agents.
-
-## Workflow
-
-- **Issue-started work:** planning subagent → main-agent implementation/QA → pull request → review loop.
-- **Existing pull request:** independent review subagents → feedback-analysis subagent → main-agent fixes/QA → re-review on the new head.
-- Finish only when the exact current head has been reviewed and no actionable feedback or unresolved blocking reviewer state remains.
-
-The review phase uses independent lenses for correctness, tests/docs, and security/performance. User-defined agents may satisfy these roles when appropriate; otherwise built-in agents are used.
-
-## Discovery
-
-- Codex-compatible agent runtimes discover the skill at `.agents/skills/pr-loop`, a symlink to `../../skills/pr-loop`.
-- Claude Code uses `.claude/skills -> ../skills`, exposing the canonical `skills/pr-loop` directory.
+For each advisory role, `pr-loop` prefers a matching user-defined native agent, then a suitable built-in agent. If the runtime cannot provide an independent bounded subagent, the workflow stops rather than silently running the role in the main context.
 
 ## Requirements
 
-- Git and authenticated GitHub access (`gh` or an equivalent integration).
-- A coding-agent runtime with a native independent-subagent mechanism.
+- Git and authenticated GitHub access through `gh` or an equivalent integration.
+- A coding-agent runtime with native independent subagents and finite dispatch bounds.
 
 ## Usage
 
-Ask the host agent to implement one or more same-repository Issues through a reviewed pull request, or to review/fix an existing pull request until it is clean.
+```text
+Implement https://github.com/OWNER/REPO/issues/123 with pr-loop
+Run pr-loop on https://github.com/OWNER/REPO/pull/456
+```
 
-See [`skills/pr-loop/SKILL.md`](skills/pr-loop/SKILL.md) for the normative workflow.
+See [`skills/pr-loop/SKILL.md`](skills/pr-loop/SKILL.md) for the normative workflow and invariants.
+
+## Background
+
+`pr-loop` is a native-subagent rewrite of the former [`oracle-pr-loop`](https://github.com/dceoy/oracle-pr-loop) workflow, without Oracle, browser automation, fixed-model, or coding-agent CLI dependencies.
