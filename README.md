@@ -34,8 +34,6 @@ Success requires the final exact head to have a verified review, reconciled feed
 
 For each advisory role, `pr-loop` prefers a matching user-defined native agent, then a suitable built-in agent. If the runtime cannot provide an independent bounded subagent, the workflow stops rather than silently running the role in the main context.
 
-The repository includes `.codex` and `.claude` configuration synchronized from `dceoy/ai-coding-agent-skills`.
-
 ## Requirements
 
 - Git and authenticated GitHub access through `gh` or an equivalent integration.
