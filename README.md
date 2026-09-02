@@ -2,7 +2,7 @@
 
 > GitHub-native, race-safe Agentic Issue-Driven Development orchestrator.
 
-`pr-loop` turns GitHub Issues into reviewed pull requests and drives existing pull requests through review, fixes, and re-review until no actionable feedback remains.
+`pr-loop` turns GitHub Issues into reviewed pull requests and drives existing pull requests through review, fixes, and re-review until no actionable feedback or reviewer-blocked state remains.
 
 It uses a single-writer multi-agent model: fresh native subagents plan, review, and analyze feedback, while the top-level agent alone mutates the repository and GitHub state.
 
@@ -13,7 +13,7 @@ flowchart LR
   I[Issue] --> P[Plan] --> M[Implement + QA] --> PR[Pull request]
   PR --> R[Review exact head] --> F[Reconcile feedback] --> X[Fix + QA]
   X --> R
-  F -->|clean| S[Success]
+  F -->|terminal| S[Success]
 ```
 
 For an existing pull request, the loop starts at review.
@@ -37,7 +37,7 @@ For each advisory role, `pr-loop` prefers a matching user-defined native agent, 
 ## Requirements
 
 - Git and authenticated GitHub access through `gh` or an equivalent integration.
-- A coding-agent runtime with native independent subagents.
+- A coding-agent runtime with native independent subagents and finite dispatch bounds.
 
 ## Usage
 
