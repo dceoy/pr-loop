@@ -12,7 +12,7 @@ It uses a single-writer multi-agent model: fresh native subagents plan, review, 
 flowchart LR
   I[Issue] --> P[Plan] --> Q{Plan ready?}
   Q -->|Ready| M[Implement + QA] --> PR[Pull request]
-  Q -->|Blocked| T[Stopped]
+  Q -->|Cannot proceed| T[Stopped]
 
   PR --> R[Review] --> N{Next step?}
   N -->|Fix| X[Fix + QA]
