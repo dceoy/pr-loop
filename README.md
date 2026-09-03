@@ -10,10 +10,16 @@ It uses a single-writer multi-agent model: fresh native subagents plan, review, 
 
 ```mermaid
 flowchart LR
-  I[Issue] --> P[Plan] --> M[Implement + QA] --> PR[Pull request]
-  PR --> R[Review exact head] --> F[Reconcile feedback] --> X[Fix + QA]
+  I[Issue] --> P[Plan] --> Q{Plan outcome?}
+  Q -->|Ready| M[Implement + QA]
+  Q -->|Blocked| D[Obtain missing decision]
+  D --> P
+  M --> PR[Pull request]
+  PR --> R[Review exact head] --> F{Next step?}
+  F -->|Fix| X[Fix + QA]
   X --> R
-  F -->|terminal| S[Success]
+  F -->|Stop| T[Stopped]
+  F -->|Finish| S[Stable reviewed PR]
 ```
 
 For an existing pull request, the loop starts at review.
