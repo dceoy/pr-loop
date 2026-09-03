@@ -13,12 +13,13 @@ flowchart LR
   I[Issue] --> P[Plan] --> Q{Plan outcome?}
   Q -->|Ready| M[Implement + QA]
   Q -->|Blocked| D[Obtain missing decision]
-  D --> P
+  D -->|Obtained| P
+  D -->|Unavailable| T[Stopped]
   M --> PR[Pull request]
   PR --> R[Review exact head] --> F{Next step?}
   F -->|Fix| X[Fix + QA]
   X --> R
-  F -->|Stop| T[Stopped]
+  F -->|Stop| T
   F -->|Finish| S[Stable reviewed PR]
 ```
 
