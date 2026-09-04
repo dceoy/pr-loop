@@ -1,6 +1,6 @@
 ---
 name: pr-loop
-description: Implement same-repository GitHub Issues into a reviewed pull request, or review and fix an existing PR, iterating with fresh independent read-only native subagents until no actionable feedback remains. Use for issue-to-PR implementation or iterative PR review/fix work.
+description: Implement same-repository GitHub Issues into a reviewed pull request, or review and fix an existing PR, iterating with fresh independent read-only native subagents selected adaptively from the change risk until no actionable feedback remains. Use for issue-to-PR implementation or iterative PR review/fix work.
 ---
 
 # PR Loop
@@ -44,15 +44,41 @@ For an Issue-started run, dispatch one fresh planning subagent for the complete 
 
 ### Review
 
-For each review attempt, dispatch three fresh subagents against the exact recorded head SHA, one per lens:
+Before dispatching reviewers for an exact head SHA, build a change and risk map from the PR intent, changed files and diff, affected interfaces, and bounded surrounding context. Identify behavior changes and material risk around public contracts, trust boundaries, persistence or migrations, concurrency, external I/O, error paths, resource lifecycle, tests, documentation, compatibility, and complexity introduced by the change.
 
-- `correctness`;
-- `tests/docs`;
-- `security/performance`.
+Select review lenses adaptively. The available lenses are:
 
-Concurrency is optional; independent contexts are mandatory. Give each the changed files and diff for that head. Candidate findings must include lens, severity (`critical`, `high`, `medium`, `low`), confidence, concrete impact, remediation direction, and a file/line anchor when safe.
+- `correctness`: behavior, regression risk, edge cases, state transitions, and concrete maintainability defects;
+- `security`: authentication, authorization, secrets, untrusted input, serialization, file/process/network boundaries, permissions, and fail-secure behavior;
+- `performance`: algorithmic complexity, I/O efficiency, batching, allocation, resource lifecycle, and realistic scalability impact;
+- `tests`: behavioral regression coverage, negative/error paths, integration boundaries, and test quality;
+- `docs`: factual documentation, examples, configuration, commands, APIs, defaults, and operational guidance;
+- `comments`: changed comments or docstrings and the implementation claims they describe;
+- `errors`: propagation, retries, fallbacks, partial success, cleanup, operator-visible failure, and silent-failure risks;
+- `types`: schemas, models, invariants, construction or mutation boundaries, narrowing, exhaustiveness, and serialization contracts;
+- `simplify`: behavior-preserving maintainability under KISS, DRY, and YAGNI, limited to concrete duplication, unnecessary complexity, or speculative functionality introduced by the PR;
+- `compatibility`: public APIs, configuration, data formats, migrations, dependencies, supported environments, and other changed compatibility contracts.
 
-Subagents return findings only; they never publish them. The top-level agent deduplicates by root cause and drops stale, speculative, style-only, unrelated, or low-confidence findings.
+For an unscoped review, always cover baseline correctness, regression risk, tests, and documentation, then add only lenses justified by concrete evidence in the change and risk map. If the caller explicitly constrains review aspects, treat that as a hard scope constraint and inspect surrounding code only as needed to validate in-scope claims.
+
+Create typically 2-6 fresh reviewer tasks, adjusting only when the change size or risk map materially requires fewer or more. Each task must have a dynamic role name describing the actual risk under review, a primary changed-file or behavior scope, one concrete risk hypothesis, and one or more selected lenses. Examples include `authorization-boundary`, `migration-integrity`, `async-cleanup`, `cli-contract-regression`, `workflow-permissions`, `type-contract`, and `test-regression`; these are task roles, not fixed agent identities.
+
+Partition the change so every changed file is owned by at least one reviewer task and every identified high-risk boundary receives focused coverage. Overlap is allowed only when materially different risk hypotheses require independent analysis. Do not mechanically create one task per lens or dispatch a fixed reviewer count independent of the PR.
+
+Give each reviewer the exact head SHA, changed files and relevant diff, plus only the bounded unchanged context needed for its task. Include:
+
+- dynamic role;
+- primary scope;
+- concrete risk hypothesis;
+- selected review lenses;
+- PR intent and applicable constraints;
+- relevant verification evidence and existing feedback when useful.
+
+Reviewer tasks return findings only; they never publish them. Candidate findings must include role, selected lenses, severity (`critical`, `high`, `medium`, `low`), confidence, concrete impact, remediation direction, and a file/line anchor when safe.
+
+The top-level agent deduplicates by root cause and drops stale, speculative, style-only, unrelated, or low-confidence findings. Apply lens-specific evidence gates before publication: security findings need a concrete trust-boundary path and must account for framework protections; performance findings need a credible workload or resource impact; test findings need a specific important regression current tests could miss; compatibility and documentation findings need a concrete changed contract; simplification findings need concrete unnecessary complexity, duplication, or speculative functionality and the smallest coherent remediation.
+
+After the initial reviewer set returns, dispatch an additional fresh reviewer only when evidence reveals a material unresolved boundary that was not reasonably identifiable before review. Do not add reviewers merely to obtain more opinions. Review discovery is complete when every changed file has accountable coverage, every identified high-risk boundary has focused coverage, and no candidate requires additional discovery context to state its claim.
 
 ### Feedback Analysis
 
@@ -79,7 +105,7 @@ For an existing-PR request, enter the PR Review Loop directly.
 
 ## PR Review Loop
 
-Use caller-specified review-attempt and same-head feedback-refresh limits when provided; otherwise they are unbounded. If only a review-attempt limit is supplied, use it for same-head feedback refreshes too. A review attempt begins when review subagents are dispatched. A same-head refresh re-runs only feedback analysis and does not consume another review attempt. Track the same-head refresh count per head SHA and reset it whenever the head changes.
+Use caller-specified review-attempt and same-head feedback-refresh limits when provided; otherwise they are unbounded. If only a review-attempt limit is supplied, use it for same-head feedback refreshes too. A review attempt begins when the adaptive reviewer set is dispatched. A same-head refresh re-runs only feedback analysis and does not consume another review attempt. Track the same-head refresh count per head SHA and reset it whenever the head changes.
 
 ### 1. Freeze the target
 
@@ -89,11 +115,11 @@ Verify that current authentication can read the feedback needed by this loop bef
 
 ### 2. Review the exact head
 
-Dispatch the three review subagents for the recorded head. Initialize an attempt-level `head_changed_since_review` flag to `false`. Whenever the loop observes a head SHA different from the reviewed SHA, including a validated post-fix push, set the flag to `true` and never clear it for that attempt even if a later fetch returns to the reviewed SHA.
+Build the change and risk map and dispatch the adaptive reviewer set for the recorded head according to the Review contract. Initialize an attempt-level `head_changed_since_review` flag to `false`. Whenever the loop observes a head SHA different from the reviewed SHA, including a validated post-fix push, set the flag to `true` and never clear it for that attempt even if a later fetch returns to the reviewed SHA.
 
-If any reviewer violates the read-only mutation contract, discard the entire three-lens round and apply the verified mutation-recovery invariant above before any publication. A recovered redispatch uses three fresh reviewers against the same unchanged head and counts as a new review attempt.
+If any reviewer violates the read-only mutation contract, discard the entire reviewer set and apply the verified mutation-recovery invariant above before any publication. A recovered redispatch uses a newly selected fresh reviewer set against the same unchanged head and counts as a new review attempt.
 
-Re-fetch the head when the review subagents finish. If it changed, discard the whole round and restart on the new SHA; the attempt still counts.
+Re-fetch the head when the reviewer set finishes. If it changed, discard the whole round and restart on the new SHA; the attempt still counts.
 
 Validate and arbitrate the findings. Immediately before publication, re-fetch the head again and discard the round if it moved.
 
@@ -143,7 +169,7 @@ Re-fetch the head after acting:
 - if `head_changed_since_review` is `true` or the head differs from the reviewed head, start a new review attempt on the current SHA;
 - if it is unchanged and the flag is `false`, take one final feedback snapshot and reconcile it against the current baseline plus recorded own mutations;
 - if new external feedback exists on the same head, refresh feedback analysis only;
-- never dispatch the three review subagents again for an unchanged head already carried through this loop.
+- never dispatch another reviewer set for an unchanged head already carried through this loop.
 
 Finish only when the final head is stable, the required `COMMENT` review was verified for that head, the feedback snapshot is reconciled, and every feedback item is terminal.
 
@@ -158,7 +184,7 @@ flowchart TD
   Q -->|ready| M[Create branch, implement, QA, commit]
   M --> N[Push and open PR]
   N --> A[Freeze PR head SHA]
-  A --> B[Review exact head]
+  A --> B[Map risks + adaptive review]
   B --> C{Head changed?}
   C -->|yes| A
   C -->|no| D[Publish COMMENT review]
