@@ -4,7 +4,7 @@ These optional project-scoped TOML files define four reusable native read-only C
 
 - `planner`: decision-complete implementation planning.
 - `advisor`: on-demand technical advice or implementation review.
-- `reviewer`: one caller-defined review lens against an exact revision.
+- `reviewer`: one caller-defined risk task with dynamically selected review lenses against an exact revision.
 - `feedback-analyst`: source-preserving feedback disposition and fix guidance.
 
 Implementation remains owned by the top-level main agent. Named agents are fresh-context terminal leaves and must not modify files or dispatch another subagent.
@@ -15,7 +15,7 @@ The TOML files intentionally omit `model` and `model_reasoning_effort`; both are
 
 - `planner`: Terra → Sol for materially complex planning.
 - `advisor`: Sol.
-- `reviewer`: correctness=Terra, tests/docs=Luna, security/performance=Terra, other lenses/scopes=Terra; escalate per `.codex/AGENTS.md`.
+- `reviewer`: select from the task's concrete risk and hardest lens: Luna for lightweight docs/comments/narrow coverage, Terra for ordinary correctness/errors/types/compatibility/simplification/performance reasoning, and Sol for security or privilege boundaries, migrations, concurrency, difficult state transitions, cross-component invariants, resource exhaustion, broad scalability, or similarly high-risk analysis.
 - `feedback-analyst`: Luna → Terra for ambiguous or code-reasoning-heavy triage.
 
 Effort is selected for the chosen model: Luna=`max`; Terra=`xhigh` or `max`; Sol=`high`, `xhigh`, or `max`. See `.codex/AGENTS.md` for the default effort within each model and escalation criteria.
