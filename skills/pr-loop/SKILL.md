@@ -57,11 +57,13 @@ The bundled `pr-review` skill is the source of truth for risk mapping, adaptive 
 
 ### Feedback analysis
 
-After each accepted review phase whose reviewed head is still the live PR head, snapshot every current feedback source and dispatch one fresh feedback-analysis subagent:
+After each accepted review phase whose reviewed head is still the live PR head, snapshot every current feedback source and dispatch one fresh feedback-analysis subagent. Preserve source-head provenance whenever GitHub exposes it:
 
-- inline threads/comments: `thread:<id>`;
-- PR-level comments: `comment:<id>`;
-- review submissions/bodies: `review:<id>`, including reviewer, persisted state, submission time, and body.
+- inline threads/comments: `thread:<id>`, including original/review commit or head metadata when available;
+- PR-level comments: `comment:<id>`, with source head recorded when one can be established, otherwise `none`;
+- review submissions/bodies: `review:<id>`, including reviewer, persisted state, submission time, reviewed/source head SHA (`commit_id`), and body.
+
+Historical feedback remains in scope. Treat its source head as provenance, not as a reason to discard it: revalidate every historical item against the current reviewed head and classify it from current evidence as `fix`, `already addressed`, `outdated`, or another applicable disposition.
 
 If one artifact contains multiple independent items, decompose them into stable item-scoped IDs while retaining the parent artifact ID. Merge only items with the same root cause.
 
