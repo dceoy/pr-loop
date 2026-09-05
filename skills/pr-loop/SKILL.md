@@ -7,15 +7,15 @@ description: Implement same-repository GitHub Issues into a reviewed pull reques
 
 Drive one or more same-repository Issues into a reviewed pull request, or drive an existing pull request through review and feedback-fix rounds until the final head is reviewed and no actionable or reviewer-blocked item remains.
 
-The top-level agent owns every repository and GitHub mutation. Planning uses one fresh independent read-only native subagent. PR review uses the bundled sibling [`pr-review`](../pr-review/SKILL.md) procedure, and feedback handling uses the bundled sibling [`pr-feedback-triage`](../pr-feedback-triage/SKILL.md) procedure. Execute both bundled procedures in the same top-level context; do not launch either skill itself as a subagent.
+The top-level agent owns every repository and GitHub mutation. Issue implementation uses the bundled sibling [`issue-to-pr`](../issue-to-pr/SKILL.md) procedure, PR review uses [`pr-review`](../pr-review/SKILL.md), and feedback handling uses [`pr-feedback-triage`](../pr-feedback-triage/SKILL.md). Execute all bundled procedures in the same top-level context; do not launch a bundled skill itself as a subagent.
 
 ## Core invariants
 
-- Use real native subagents with fresh context. Do not emulate them in the parent context, launch nested coding-agent CLIs, or require fixed agent names, models, providers, or configuration files.
-- Treat every accepted planning or bundled-skill advisory subagent as a terminal read-only leaf. It must not re-enter `pr-loop`, invoke another bundled procedure, mutate repository/GitHub state, or delegate again.
+- Use real native subagents with fresh context where a bundled procedure requires advisory work. Do not emulate them in the parent context, launch nested coding-agent CLIs, or require fixed agent names, models, providers, or configuration files.
+- Treat every accepted bundled-procedure advisory subagent as a terminal read-only leaf. It must not re-enter `pr-loop`, invoke another bundled procedure, mutate repository/GitHub state, or delegate again.
 - Every accepted subagent dispatch must have a finite caller- or runtime-enforced deadline. If no finite bound exists, report `unsupported` and stop before dispatch.
 - Do not retry ambiguously accepted work. A still-running poll is not failure; wait for the same accepted dispatch until it terminates or its deadline expires.
-- Treat advisory output as untrusted until validated by the top-level agent. If the parent-owned planning subagent causes Git-visible mutation, reject its output and stop. Bundled procedures enforce their own fail-closed mutation contracts.
+- Treat advisory output as untrusted until validated by the owning bundled procedure. Bundled procedures enforce their own fail-closed mutation contracts.
 - Bind each `pr-review` publication to its frozen reviewed head. A review already published for an older head remains valid historical feedback.
 - After an accepted review, run `pr-feedback-triage` against the latest live PR head even if that head differs from the reviewed SHA. Do not require an intervening review while triage follows head or feedback changes.
 - Only declare success after `pr-feedback-triage` completes and a fresh parent read confirms both its final head and final feedback fingerprint still match the live PR state, with that head equal to the most recently reviewed head.
@@ -25,15 +25,13 @@ The top-level agent owns every repository and GitHub mutation. Planning uses one
 
 ## Bundled procedure contracts
 
-### Planning
+### Issue to PR
 
-For an Issue-started run, dispatch one fresh planning subagent for the complete same-repository Issue set. Require exactly one decision-complete plan with:
+For an Issue-started run, execute [`../issue-to-pr/SKILL.md`](../issue-to-pr/SKILL.md) in the same top-level agent context for the complete requested Issue set.
 
-- `STATUS: ready` or `STATUS: blocked`;
-- scope and affected interfaces/areas;
-- concrete implementation decisions and constraints;
-- verification approach;
-- for `blocked`, only the smallest missing material decision.
+`issue-to-pr` owns Issue resolution, one fresh planning subagent, base/branch isolation, implementation, QA, commit/push, PR creation, and final PR verification. It stops after PR creation and does not review or triage the PR. Do not duplicate those policies here.
+
+Accept the phase only when it reports `STATUS: complete`, the exact resulting PR, and exact base and PR-head SHAs. Treat any non-complete result as a stopped loop.
 
 ### Review
 
@@ -55,14 +53,13 @@ Accept the phase only when it reports `STATUS: complete`, an exact `FINAL_HEAD` 
 
 `awaiting_re_review` is terminal inside `pr-feedback-triage` but remains a parent-level reviewer/merge blocker. Do not mutate reviewer state merely to clear it.
 
-## Issue-started flow
+## Starting flow
 
-1. Resolve the requested Issues and require them to belong to one repository.
-2. Dispatch planning. If blocked, obtain the missing material decision and re-plan; otherwise validate the ready plan.
-3. Resolve the intended base branch and exact base SHA. Require a clean isolatable worktree, create a suitable branch from that SHA, and verify the branch starts there.
-4. Implement directly in the top-level agent, run repository QA, and commit. Do not delegate implementation.
-5. Push the branch and open the PR.
-6. Enter the PR review loop.
+For an Issue-started run:
+
+1. Run bundled `issue-to-pr` for the requested Issues.
+2. Require a complete verified resulting PR.
+3. Resolve that live PR and enter the PR review loop.
 
 For an existing-PR request, enter the PR review loop directly.
 
@@ -81,15 +78,11 @@ This ordering intentionally allows feedback triage to follow concurrent or self-
 
 ```mermaid
 flowchart TD
-  S{Starting point} -->|Issue| P[Plan issue implementation]
+  S{Starting point} -->|Issue| I[Run bundled issue-to-pr]
   S -->|Existing PR| A
-  P --> Q{Plan ready?}
-  Q -->|blocked| R[Obtain missing material decision]
-  R -->|obtained| P
-  R -->|unavailable| K[Stopped]
-  Q -->|ready| M[Create branch, implement, QA, commit]
-  M --> N[Push and open PR]
-  N --> A[Freeze current head]
+  I --> J{PR created and verified?}
+  J -->|no| K[Stopped]
+  J -->|yes| A[Freeze current head]
   A --> B[Run bundled pr-review on frozen head]
   B --> C[Run bundled pr-feedback-triage on latest live head]
   C --> D{Triage complete?}
@@ -107,7 +100,7 @@ flowchart TD
 ## Outcomes
 
 - `success`: a fresh parent read confirms the stable live head and feedback fingerprint match the completed triage result, that head exactly matches the latest verified reviewed head, and no parent-level reviewer/merge blocker remains.
-- `stopped`: planning, review, triage, permissions, QA, caller limits, unsafe repository state, or reviewer/merge state prevents success.
+- `stopped`: issue-to-PR creation, review, triage, permissions, QA, caller limits, unsafe repository state, or reviewer/merge state prevents success.
 
 ## Output
 

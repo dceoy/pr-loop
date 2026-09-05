@@ -10,9 +10,8 @@ It uses a single-writer multi-agent model: fresh native subagents plan, review, 
 
 ```mermaid
 flowchart LR
-  I[Issue] --> P[Plan] --> Q{Plan ready?}
-  Q -->|Ready| M[Implement + QA] --> PR[Pull request]
-  Q -->|Cannot proceed| T[Stopped]
+  I[Issue] --> C[Bundled issue-to-pr] --> PR[Pull request]
+  C -->|Cannot proceed| T[Stopped]
 
   PR --> R[Bundled pr-review]
   R --> F[Bundled pr-feedback-triage<br/>on latest live head]
@@ -25,9 +24,13 @@ flowchart LR
 
 For an existing pull request, the loop starts at review.
 
+Issue implementation is provided by the bundled [`issue-to-pr`](skills/issue-to-pr/SKILL.md) skill. It resolves and plans the requested same-repository Issues, creates an isolated branch from an exact base SHA, implements and verifies the change, pushes it, and opens a verified PR. It is also usable standalone and deliberately stops before review.
+
 The review phase is provided by the bundled [`pr-review`](skills/pr-review/SKILL.md) skill. `pr-loop` executes that procedure in the same top-level agent context rather than launching it as a nested subagent, so review discovery and independent validation remain direct fresh read-only leaves while the single-writer boundary stays intact.
 
 Feedback handling is provided by the bundled [`pr-feedback-triage`](skills/pr-feedback-triage/SKILL.md) skill, based on the merged `dceoy/ai-coding-agent-skills` version and hardened here for composed race-safety. It is also executed in the top-level context and owns feedback analysis, focused fixes, QA, commit/push, replies, resolutions, and reconciliation.
+
+All three bundled procedures run in the same top-level agent context. `issue-to-pr` may dispatch its planning advisor, `pr-review` its review advisors, and `pr-feedback-triage` its feedback advisor, but those advisors remain fresh read-only leaf subagents; only the top-level agent mutates repository or GitHub state.
 
 `pr-review` completes one frozen-head review and publishes it explicitly against that exact commit even if the live PR head advances. After it returns, `pr-loop` does not force another review before feedback handling: `pr-feedback-triage` starts from the latest live head and follows further head or feedback changes until triage completes. If triage finishes on a head different from the reviewed SHA, `pr-loop` starts another review round on that final head. This guarantees that the final head is reviewed before success without interrupting live-head triage.
 
@@ -36,6 +39,7 @@ Reviews are selected adaptively from the change and risk map rather than using a
 ## Race-safety
 
 - **Single writer:** only the top-level agent edits, commits, pushes, publishes reviews, replies, or resolves threads.
+- **Exact-base implementation:** `issue-to-pr` binds a fresh implementation branch to an exact base SHA and verifies the resulting PR before returning it.
 - **Frozen-head review:** each review is published for exactly one frozen head SHA and remains valid historical feedback if the head later advances.
 - **Live-head triage:** feedback triage follows the latest live head without requiring an intervening review and discards stale prepared work whenever head or feedback state changes.
 - **Safe publication:** fix batches use an isolated worktree rooted at the analyzed head, exact head+feedback gates before mutation and push, and an expected-SHA lease so a changed remote ref cannot be overwritten or resurrect stale commits.
@@ -47,7 +51,7 @@ Success requires the stable live head to equal the latest verified reviewed head
 
 ## Agent routing
 
-For each advisory role, `pr-loop` prefers a matching user-defined native agent, then a suitable built-in agent. If the runtime cannot provide an independent bounded subagent, the workflow stops rather than silently running the role in the main context.
+For each advisory role, the owning skill prefers a matching user-defined native agent, then a suitable built-in agent. If the runtime cannot provide an independent bounded subagent, the workflow stops rather than silently running the role in the main context.
 
 ## Requirements
 
@@ -57,13 +61,14 @@ For each advisory role, `pr-loop` prefers a matching user-defined native agent, 
 ## Usage
 
 ```text
+Implement https://github.com/OWNER/REPO/issues/123 with issue-to-pr
 Implement https://github.com/OWNER/REPO/issues/123 with pr-loop
 Run pr-loop on https://github.com/OWNER/REPO/pull/456
 Review https://github.com/OWNER/REPO/pull/456 with pr-review
 Triage https://github.com/OWNER/REPO/pull/456 with pr-feedback-triage
 ```
 
-See [`skills/pr-loop/SKILL.md`](skills/pr-loop/SKILL.md) for orchestration, [`skills/pr-review/SKILL.md`](skills/pr-review/SKILL.md) for review, and [`skills/pr-feedback-triage/SKILL.md`](skills/pr-feedback-triage/SKILL.md) for live-head feedback handling.
+See [`skills/issue-to-pr/SKILL.md`](skills/issue-to-pr/SKILL.md) for standalone Issue implementation, [`skills/pr-loop/SKILL.md`](skills/pr-loop/SKILL.md) for orchestration, [`skills/pr-review/SKILL.md`](skills/pr-review/SKILL.md) for review, and [`skills/pr-feedback-triage/SKILL.md`](skills/pr-feedback-triage/SKILL.md) for live-head feedback handling.
 
 ## Background
 
