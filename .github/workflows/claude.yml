@@ -31,8 +31,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-      issues: write
-      id-token: write
       actions: read
     uses: dceoy/gha-for-devops/.github/workflows/claude-code-review.yml@main  # zizmor: ignore[unpinned-uses]
     secrets:
