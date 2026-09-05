@@ -18,7 +18,7 @@ The top-level agent owns every repository and GitHub mutation. Planning uses one
 - The top-level agent alone edits files, runs write-mode tooling, commits, pushes, and opens or updates the PR.
 - Preserve unrelated local work. Stop before editing if the worktree cannot be safely isolated or bound to the intended base.
 - Keep implementation scoped. Apply KISS, DRY, and YAGNI; prefer the smallest coherent change and avoid speculative abstraction or unrelated cleanup.
-- Never overwrite an existing remote branch or unrelated PR to make progress.
+- Create the remote implementation branch only when its ref is still absent; never update an existing remote branch or unrelated PR to make progress.
 
 ## Planning contract
 
@@ -40,7 +40,7 @@ If blocked, obtain the missing material decision and re-plan. Stop if it cannot 
 4. Implement the validated plan directly in the top-level agent. Do not delegate implementation.
 5. Run the repository-prescribed QA appropriate to the changed scope. If QA modifies intended files, include those changes and rerun the required checks. Stop on unresolved QA failure.
 6. Inspect the final diff for Issue scope and unrelated changes, then commit it.
-7. Push the fresh branch without force and verify the remote branch points to the intended commit.
+7. Publish the fresh branch with an atomic create-only guard that requires the destination remote ref not to exist (for Git, an explicit empty-expected-value `--force-with-lease=<ref>:` or equivalent API semantics). Stop if the remote ref already exists or is created concurrently, then verify the created remote ref points to the intended commit.
 8. Open a pull request against the intended base with the implemented Issues linked in its body. Re-fetch it and verify its repository, base, head ref, and head SHA match the created branch and commit.
 9. Stop. Do not invoke `pr-review`, `pr-feedback-triage`, or any other review loop.
 
