@@ -19,9 +19,9 @@ Use a new marker for every invocation so an older review cannot satisfy verifica
 
 Never mix analysis from different head SHAs.
 
-If the runtime can explicitly bind review publication to the frozen reviewed commit, publish against that exact commit even when the live PR head has advanced. The resulting review may be rendered as outdated; that is acceptable because its target is unambiguous.
+When a caller supplied an exact target head, immediately re-fetch the live PR head before publication regardless of commit-bound publication support. If the live head differs from the requested target, return `stale` without publishing. This preserves caller workflows that require stale review decisions to be discarded before any GitHub mutation.
 
-If the runtime cannot guarantee commit-bound publication, immediately re-fetch the live PR head before posting. If it differs from the reviewed head, never publish feedback with an ambiguous target: restart against the new snapshot in standalone mode, or return `stale` without publication when a caller supplied the exact target head.
+In standalone mode, if the runtime can explicitly bind review publication to the frozen reviewed commit, publish against that exact commit even when the live PR head has advanced; GitHub may render that review as outdated. If commit-bound publication is unavailable, immediately re-fetch the live head before posting and restart against the new snapshot when it differs from the reviewed head.
 
 Immediately before mutation, re-fetch current review feedback and drop findings already clearly covered so concurrent reviews are not duplicated.
 

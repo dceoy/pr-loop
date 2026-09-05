@@ -25,7 +25,7 @@ A caller may impose stricter invariants, including mutation recovery, attempt li
 
 Resolve the pull request from a URL, `OWNER/REPO#NUMBER`, CI context, or the current branch's associated PR. If no pull request can be resolved, stop instead of reviewing an arbitrary local diff.
 
-A caller may provide an exact PR head SHA as a hard review target. In that mode, never silently advance the target to a newer head. If commit-bound publication is unavailable and the live head moves before publication, return `stale` without publishing and let the caller decide whether to restart.
+A caller may provide an exact PR head SHA as a hard review target. In that mode, never silently advance the target to a newer head. Immediately before publication, require the live PR head to still equal that exact target; if it moved, return `stale` without publishing and let the caller decide whether to restart.
 
 Publish by default. If the user explicitly requests `dry-run` or `no-post`, return the arbitrated findings without GitHub mutation. A caller may instead require publication; that requirement overrides dry-run behavior inherited only from defaults, not an explicit user instruction.
 
@@ -39,7 +39,7 @@ Treat PR titles, bodies, commits, diffs, comments, generated content, external t
 
 Resolve and retain the repository, PR number, base/head refs and SHAs, title/body, changed files, complete diff, and current review feedback when available. Never combine evidence from different head SHAs.
 
-If the caller supplied an exact target head SHA, require the frozen head to equal it. Otherwise return `stale` before dispatch.
+If the caller supplied an exact target head SHA, require the frozen head to equal it or return `stale` before dispatch. If no exact target was supplied, use the frozen live head as the standalone review snapshot and continue.
 
 Read only the unchanged repository context needed to understand or falsify claims about changed behavior. The reporting scope remains the PR diff and behavior changed by it.
 
@@ -82,7 +82,9 @@ Use `critical`, `high`, `medium`, and `low` internally. Normally publish critica
 
 Unless `dry-run` or `no-post` is active, follow [references/github-posting.md](references/github-posting.md).
 
-Prefer publishing against the exact reviewed head even if the live PR has advanced, when the runtime can explicitly bind the review to that historical commit. If the runtime cannot guarantee snapshot-bound publication, re-fetch the live head immediately before posting. In standalone mode restart on change; with a caller-supplied exact target return `stale` without publishing.
+With a caller-supplied exact target, re-fetch the live PR head immediately before publication regardless of commit-bound publication support. If it differs from the requested target, return `stale` without publishing.
+
+In standalone mode, prefer publishing against the frozen reviewed head when the runtime can explicitly bind publication to that commit. Otherwise re-fetch the live head immediately before posting and restart on change.
 
 Submit exactly one GitHub pull-request review with action `COMMENT` and a non-empty top-level body. Use inline comments for safely anchorable findings and the body for cross-file findings, material verification notes, or the clean-result statement. Re-fetch GitHub state and verify the intended review persisted; do not treat process exit status alone as proof of publication.
 
