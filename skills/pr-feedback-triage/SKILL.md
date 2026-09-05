@@ -1,7 +1,6 @@
 ---
 name: pr-feedback-triage
 description: Triage pull request feedback against the current head, apply focused fixes, and finish the required replies and thread resolutions.
-allowed-tools: Bash(git:*), Bash(gh:*), mcp__github__*, Read, Grep, Glob, Edit, MultiEdit, Write
 ---
 
 # PR Feedback Triage
@@ -35,7 +34,7 @@ Require one disposition per distinct item: `fix`, `already addressed`, `outdated
 
 At completion, compute `FINAL_FEEDBACK` as the lowercase hex SHA-256 of canonical UTF-8 JSON for the full final paginated feedback snapshot. Normalize each platform source into one record containing its typed source ID and every value reconciliation compares, represent unavailable values as JSON `null`, sort records by typed source ID, sort nested comment/reply records by their platform ID, and recursively serialize object keys in lexicographic order with no insignificant whitespace. Preserve array order only when that order is itself reconciliation-significant. The parent rebuilds the same canonical JSON from a fresh paginated read and hashes it identically.
 
-Use a caller-specified triage-restart limit when provided; otherwise restarts are unbounded. A limit of `N` permits `N` actual restarts after the initial snapshot. Before each transition back to the live snapshot, stop with `limit_exhausted` if the restart count already equals the limit; otherwise increment the count and perform the restart.
+Use a caller-specified triage-restart limit when provided; otherwise restarts are unbounded. A limit of `N` permits `N` actual restarts after the initial snapshot. Before each transition back to the live snapshot, stop with `limit_exhausted` if the restart count already equals the limit; otherwise increment the count and perform the restart. `RESTARTS` reports the actual restart count consumed by the current invocation.
 
 ## Flow
 
@@ -97,4 +96,13 @@ Completion is blocked by unpublished fixes, missing clarification, non-terminal 
 
 ## Output
 
-Return `STATUS: complete|stopped`, `FINAL_HEAD: <sha>|none`, and `FINAL_FEEDBACK: <fingerprint>|none`, then report disposition counts, fixes and verification, replies/resolutions, terminal-state counts, restart count/limit, and any remaining blocker or required reviewer/user action.
+Return:
+
+```text
+STATUS: complete | stopped
+FINAL_HEAD: <sha> | none
+FINAL_FEEDBACK: <fingerprint> | none
+RESTARTS: <integer>
+```
+
+Then report disposition counts, fixes and verification, replies/resolutions, terminal-state counts, restart limit, and any remaining blocker or required reviewer/user action.
