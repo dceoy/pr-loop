@@ -6,14 +6,14 @@ Every delegated PR-review task must use a genuinely fresh native read-only subag
 
 A valid invocation must:
 
-- start without inherited conversational history from the parent;
+- start without inherited conversational history from the orchestrator;
 - receive only the bounded task packet needed for its assigned hypothesis;
 - be read-only with respect to repository files and GitHub state;
 - operate on the exact frozen review snapshot;
-- return advisory analysis to the parent instead of publishing feedback;
+- return advisory analysis to the orchestrator instead of publishing feedback;
 - remain terminal and never dispatch another agent.
 
-Do not substitute a nested coding-agent CLI, a second parent pass, a copied prompt with inherited context, or a provider-specific agent requirement. If the runtime cannot provide the required isolation, return `unsupported` and stop.
+Honor applicable project/runtime routing when choosing a compatible native subagent. Named project roles, built-in agents, and runtime-selected models are all acceptable when they satisfy this contract. Do not require a provider-specific identity, fixed model, copied prompt simulation, second orchestrator pass, nested coding-agent CLI, or inherited-context worker. If the runtime cannot provide the required isolation, return `unsupported` and stop.
 
 ## Dispatch lifecycle
 
@@ -57,7 +57,7 @@ If no candidate exists, return exactly `CANDIDATES: none` so an empty result can
 
 ## Validation output
 
-The parent supplies one or more complete deduplicated candidate records with stable identifiers and any known counterevidence. Each candidate must be evaluated independently even when several candidates share one bounded validation task.
+The orchestrator supplies one or more complete deduplicated candidate records with stable identifiers and any known counterevidence. Each candidate must be evaluated independently even when several candidates share one bounded validation task.
 
 Return only what validation adds for each candidate:
 
@@ -77,7 +77,7 @@ Use the smallest number of fresh validation tasks that preserves independent cou
 
 Subagents must never edit, create, delete, stage, commit, or push files; mutate pull requests or issues; publish comments or reviews; change checks, labels, reviewers, branches, workflows, or repository settings; or launch another coding agent.
 
-All GitHub mutation belongs to the top-level parent after arbitration.
+All review publication and GitHub mutation belongs to the orchestrator after arbitration.
 
 ## Discovery dispatch policy
 
