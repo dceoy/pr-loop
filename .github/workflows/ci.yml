@@ -27,30 +27,41 @@ jobs:
       - uses: actions/checkout@v7  # zizmor: ignore[unpinned-uses]
         with:
           persist-credentials: false
-      - name: Verify canonical skill and discovery links
+      - name: Verify canonical skills and discovery links
         run: |
           exit_status=0
-          name=pr-loop
-          skill_file="skills/${name}/SKILL.md"
-          if [ ! -f "${skill_file}" ]; then
-            echo "::error::missing ${skill_file}"
-            exit_status=1
-          elif ! grep -qx "name: ${name}" "${skill_file}"; then
-            echo "::error::${skill_file} does not declare 'name: ${name}'"
-            exit_status=1
-          fi
-
-          agents_link=".agents/skills/${name}"
-          if [ ! -L "${agents_link}" ] || [ "$(readlink "${agents_link}")" != "../../skills/${name}" ]; then
-            echo "::error::${agents_link} must link to ../../skills/${name}"
-            exit_status=1
-          fi
+          skill_count=0
 
           if [ ! -L .claude/skills ] || [ "$(readlink .claude/skills)" != "../skills" ]; then
             echo "::error::.claude/skills must link to ../skills"
             exit_status=1
-          elif [ ! -f ".claude/skills/${name}/SKILL.md" ]; then
-            echo "::error::.claude/skills does not expose ${name}"
+          fi
+
+          for skill_file in skills/*/SKILL.md; do
+            [ -f "${skill_file}" ] || continue
+            skill_count=$((skill_count + 1))
+            name="${skill_file#skills/}"
+            name="${name%/SKILL.md}"
+
+            if ! grep -qx "name: ${name}" "${skill_file}"; then
+              echo "::error::${skill_file} does not declare 'name: ${name}'"
+              exit_status=1
+            fi
+
+            agents_link=".agents/skills/${name}"
+            if [ ! -L "${agents_link}" ] || [ "$(readlink "${agents_link}")" != "../../skills/${name}" ]; then
+              echo "::error::${agents_link} must link to ../../skills/${name}"
+              exit_status=1
+            fi
+
+            if [ -L .claude/skills ] && [ ! -f ".claude/skills/${name}/SKILL.md" ]; then
+              echo "::error::.claude/skills does not expose ${name}"
+              exit_status=1
+            fi
+          done
+
+          if [ "${skill_count}" -eq 0 ]; then
+            echo "::error::no canonical skills found under skills/*/SKILL.md"
             exit_status=1
           fi
 
