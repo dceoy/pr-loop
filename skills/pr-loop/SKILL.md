@@ -35,7 +35,7 @@ Accept only `STATUS: reviewed` with `REVIEWED_HEAD == reviewed_target` and `PUBL
 
 After an accepted review, execute [`../pr-feedback-triage/SKILL.md`](../pr-feedback-triage/SKILL.md) for the same PR against its latest live state.
 
-Accept only `STATUS: complete` with exact `FINAL_HEAD` and `FINAL_FEEDBACK`. `awaiting_re_review` remains a parent-level reviewer/merge blocker. Any other non-complete result stops the loop.
+Accept only `STATUS: complete` with exact `FINAL_HEAD` and `FINAL_FEEDBACK`. `awaiting_re_review` remains a parent-level reviewer/merge blocker; do not mutate reviewer state merely to clear it. Any other non-complete result stops the loop.
 
 ## Limits
 
