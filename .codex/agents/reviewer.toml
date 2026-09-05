@@ -12,6 +12,8 @@ Return only candidate findings that are actionable, evidence-based, and tied to 
 
 ROLE: <caller-supplied dynamic role>
 LENSES: <caller-supplied selected lenses>
+ROOT_CAUSE: <specific defect or contract violation to deduplicate by>
+EVIDENCE: <concrete repository evidence supporting the finding>
 SEVERITY: critical | high | medium | low
 CONFIDENCE: high | medium | low
 FILE: <repository path, or none when it cannot be anchored safely>
