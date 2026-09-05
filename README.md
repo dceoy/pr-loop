@@ -27,7 +27,7 @@ For an existing pull request, the loop starts at review.
 
 The review phase is provided by the bundled [`pr-review`](skills/pr-review/SKILL.md) skill. `pr-loop` executes that procedure in the same top-level agent context rather than launching it as a nested subagent, so review discovery and independent validation remain direct fresh read-only leaves while the single-writer boundary stays intact.
 
-Feedback handling is provided by the bundled [`pr-feedback-triage`](skills/pr-feedback-triage/SKILL.md) skill, copied from `dceoy/ai-coding-agent-skills`. It is also executed in the top-level context and owns feedback analysis, focused fixes, QA, commit/push, replies, resolutions, and reconciliation.
+Feedback handling is provided by the bundled [`pr-feedback-triage`](skills/pr-feedback-triage/SKILL.md) skill, based on the merged `dceoy/ai-coding-agent-skills` version and hardened here for composed race-safety. It is also executed in the top-level context and owns feedback analysis, focused fixes, QA, commit/push, replies, resolutions, and reconciliation.
 
 `pr-review` completes one frozen-head review and publishes it explicitly against that exact commit even if the live PR head advances. After it returns, `pr-loop` does not force another review before feedback handling: `pr-feedback-triage` starts from the latest live head and follows further head or feedback changes until triage completes. If triage finishes on a head different from the reviewed SHA, `pr-loop` starts another review round on that final head. This guarantees that the final head is reviewed before success without interrupting live-head triage.
 
@@ -38,10 +38,10 @@ Reviews are selected adaptively from the change and risk map rather than using a
 - **Single writer:** only the top-level agent edits, commits, pushes, publishes reviews, replies, or resolves threads.
 - **Frozen-head review:** each review is published for exactly one frozen head SHA and remains valid historical feedback if the head later advances.
 - **Live-head triage:** feedback triage follows the latest live head without requiring an intervening review and discards stale prepared work whenever head or feedback state changes.
-- **Safe publication:** fix batches use an isolated worktree rooted at the analyzed head, exact head+feedback gates before mutation and push, and non-force publication.
+- **Safe publication:** fix batches use an isolated worktree rooted at the analyzed head, exact head+feedback gates before mutation and push, and an expected-SHA lease so a changed remote ref cannot be overwritten or resurrect stale commits.
 - **Final-head review:** when triage changes the head, the resulting stable head starts the next review round before success.
 - **Fresh advisors:** planning, review discovery/validation, and feedback analysis run in independent read-only subagents with fresh context.
-- **Fail closed:** the loop stops on ambiguous state, unsafe worktrees, unavailable required subagents, failed QA/publication, or unresolved reviewer/merge blockers.
+- **Fail closed:** the loop stops on ambiguous state, unsafe worktrees, unavailable required subagents, failed QA/publication, exhausted caller limits, or unresolved reviewer/merge blockers.
 
 Success requires the stable live head to equal the latest verified reviewed head, bundled feedback triage to have completed for that state, and no parent-level blocker such as `awaiting_re_review` to remain.
 
