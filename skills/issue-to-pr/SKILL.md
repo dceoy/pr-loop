@@ -7,16 +7,15 @@ description: Implement one or more same-repository GitHub Issues into a pull req
 
 Turn one or more same-repository GitHub Issues into an implementation pull request. Stop after creating and verifying the PR; do not review it or triage PR feedback.
 
-An orchestrator coordinates the procedure and owns commit, push, PR creation, and final state validation. Planning uses one fresh independent read-only native subagent. Implementation may run in the orchestrator or in one project/runtime-selected implementation worker, but only one repository writer may be active at a time.
+An orchestrator coordinates the procedure and owns commit, push, PR creation, and final state validation. Planning follows applicable project/runtime routing: the orchestrator may plan directly or use one compatible fresh independent read-only native subagent. Implementation may run in the orchestrator or in one project/runtime-selected implementation worker, but only one repository writer may be active at a time.
 
 ## Core invariants
 
-- Honor applicable project/runtime routing for agent names, models, and implementation delegation when it is compatible with this skill's safety and result contracts. Do not require a fixed agent name, model, provider, or configuration file.
-- Use a real native subagent with fresh context for planning. Do not emulate planning in the orchestrator or launch nested coding-agent CLIs.
-- Treat the accepted planning subagent as a terminal read-only leaf. It must not invoke `issue-to-pr`, mutate repository/GitHub state, or delegate again.
-- The planning dispatch must have a finite caller- or runtime-enforced deadline. If no finite bound exists, report `unsupported` and stop before dispatch.
-- Bind planning and implementation to the same exact repository base SHA. Repository evidence supplied to planning must come from that frozen revision rather than a mutable working tree or moving branch tip.
-- Treat planning and delegated implementation output as untrusted until validated by the orchestrator. Reject planning output if its subagent causes Git-visible mutation.
+- Honor applicable project/runtime routing for agent names, models, planning topology, and implementation delegation when it is compatible with this skill's safety and result contracts. Do not require a fixed agent name, model, provider, configuration file, or delegation topology.
+- Planning may remain in the orchestrator or be delegated. When delegated, use a real native subagent with fresh context; do not emulate delegation with copied prompts or nested coding-agent CLIs. The accepted planning subagent must be a terminal read-only leaf that does not invoke `issue-to-pr`, mutate repository/GitHub state, or delegate again.
+- Every delegated planning dispatch requires a finite caller- or runtime-enforced deadline. If applicable routing requires delegated planning but the runtime cannot satisfy the required isolation or deadline, report `unsupported` and stop before dispatch.
+- Bind planning and implementation to the same exact repository base SHA. Repository evidence used for planning must come from that frozen revision rather than a mutable working tree or moving branch tip.
+- The orchestrator validates the completed plan regardless of where planning ran. Treat delegated planning and implementation output as untrusted until validated; reject delegated planning output if its subagent causes Git-visible mutation.
 - Implementation edits and scoped QA may be performed directly or by one compatible implementation worker in the isolated implementation worktree. While that worker is active, no other actor may modify the repository worktree. The worker must stay within the validated plan and must not commit, push, mutate GitHub state, invoke this skill, or delegate again.
 - Before commit, the orchestrator re-checks the exact worktree/base binding, validates the complete diff against the accepted plan and current Issue snapshot, and reruns or verifies the required QA evidence. The orchestrator alone commits, pushes, and opens or updates the PR.
 - Preserve unrelated local work. Stop before editing if the worktree cannot be safely isolated or bound to the intended base.
@@ -25,7 +24,7 @@ An orchestrator coordinates the procedure and owns commit, push, PR creation, an
 
 ## Planning contract
 
-Snapshot the complete requested same-repository Issue set, applicable repository instructions, intended base branch, and its exact current SHA before planning. Dispatch one fresh planning subagent against that frozen repository revision and Issue snapshot. Require exactly one decision-complete plan with:
+Snapshot the complete requested same-repository Issue set, applicable repository instructions, intended base branch, and its exact current SHA before planning. Produce exactly one decision-complete plan against that frozen repository revision and Issue snapshot, either directly in the orchestrator or through a compatible delegated planner selected by project/runtime routing. Require:
 
 - `STATUS: ready` or `STATUS: blocked`;
 - scope and affected interfaces/areas;
@@ -41,7 +40,7 @@ If a blocked plan receives the missing decision, or the Issue requirements mater
 flowchart TD
   A[Resolve Issues, instructions, base branch + exact SHA] --> B{All Issues in one repository?}
   B -->|no| X[Stopped]
-  B -->|yes| C[Dispatch planner on frozen repository + Issue snapshot]
+  B -->|yes| C[Plan on frozen snapshot using compatible project/runtime routing]
   C --> D{Planning output valid?}
   D -->|no| X
   D -->|yes| E{Plan status}
@@ -69,7 +68,7 @@ flowchart TD
 
 - `complete`: the requested Issues have been implemented from the exact planned base and a matching PR has been created and verified.
 - `stopped`: planning, missing decisions, permissions, unsafe repository state, unresolved QA, push, or PR creation/verification prevents completion.
-- `unsupported`: the runtime cannot provide a required planning isolation/deadline or other mandatory capability.
+- `unsupported`: applicable routing requires delegated planning that the runtime cannot execute with the required isolation/deadline, or another mandatory capability is unavailable.
 
 ## Output
 
