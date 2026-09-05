@@ -23,7 +23,7 @@ flowchart LR
 
 For an existing pull request, the loop starts at review.
 
-Reviews are selected adaptively from the change and risk map rather than using a fixed reviewer set. Baseline correctness, regression, tests, and documentation coverage is always retained, while security, performance, errors, types, comments, compatibility, and KISS/DRY/YAGNI simplification lenses are added only when the PR justifies them. Reviewer tasks are scoped around concrete risks, and Codex installations can route each task to Luna, Terra, or Sol according to its difficulty and risk.
+Reviews are selected adaptively from the change and risk map rather than using a fixed reviewer set. Unscoped reviews retain baseline correctness, regression, tests, and documentation coverage, while security, performance, errors, types, comments, compatibility, and KISS/DRY/YAGNI simplification lenses are added only when the PR justifies them. Explicitly scoped reviews honor the caller's requested aspects as a hard constraint. Reviewer tasks are scoped around concrete risks, and Codex installations can route each task to Luna, Terra, or Sol according to its difficulty and risk.
 
 Feedback is classified into concrete dispositions such as `fix`, `already addressed`, `outdated`, `answer`, `clarify`, `defer`, or `won't fix`.
 
