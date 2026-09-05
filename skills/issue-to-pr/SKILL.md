@@ -47,7 +47,9 @@ flowchart TD
   G --> H[Implement validated plan in the top-level agent]
   H --> I[Run prescribed scoped QA; include intended QA changes and rerun]
   I --> J{QA passes?}
-  J -->|no| X
+  J -->|no| Q{Failure fixable within validated scope?}
+  Q -->|yes| H
+  Q -->|no| X
   J -->|yes| K[Inspect final scoped diff and commit]
   K --> L[Atomically create remote branch and verify its commit]
   L --> M{Published safely?}
@@ -61,7 +63,7 @@ flowchart TD
 ## Outcomes
 
 - `complete`: the requested Issues have been implemented and a matching PR has been created and verified.
-- `stopped`: planning, missing decisions, permissions, unsafe repository state, QA, push, or PR creation/verification prevents completion.
+- `stopped`: planning, missing decisions, permissions, unsafe repository state, unresolved QA, push, or PR creation/verification prevents completion.
 
 ## Output
 
