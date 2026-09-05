@@ -12,22 +12,22 @@ Compose the sibling [`issue-to-pr`](../issue-to-pr/SKILL.md), [`pr-review`](../p
 ## Composition invariants
 
 - The top-level agent owns repository and GitHub mutations across the composite run.
-- Advance only after the active sibling procedure reaches its documented successful terminal state.
+- Advance only after the active sibling procedure reaches its documented successful terminal state. Propagate `unsupported` when a required sibling or execution bound is unsupported; otherwise stop on non-success.
 - Bind each `pr-review` invocation to one frozen PR head SHA; an older-head review remains valid historical feedback.
 - Run `pr-feedback-triage` against the latest live PR state after each accepted review, even when that state has advanced beyond the reviewed SHA.
 - Before success, freshly verify that the live head and complete relevant feedback equal the latest triage-complete snapshot retained in the shared top-level context and that the live head equals the latest reviewed head.
 
 ## Phase contracts
 
-- Issue start: run `issue-to-pr` for the complete requested Issue set. Continue only after `STATUS: complete` and a verified resulting PR with exact planned base and PR-head SHAs; otherwise stop.
+- Issue start: run `issue-to-pr` for the complete requested Issue set. Continue only after `STATUS: complete` and a verified resulting PR with exact planned base and PR-head SHAs; otherwise propagate `unsupported` or stop.
 - Review: freeze the current PR head as `reviewed_target` and run `pr-review` for that exact PR/SHA with publication enabled. Continue only after `STATUS: reviewed` and `REVIEWED_HEAD == reviewed_target`; `reviewed` already implies verified publication for that frozen head.
-- Triage: run `pr-feedback-triage` for the same PR against its latest live state with the remaining finite restart budget. Continue only after `STATUS: complete`; retain its exact final head and complete final feedback snapshot directly in the shared top-level context. `awaiting_re_review` remains a parent-level reviewer/merge blocker and must not be cleared by mutating reviewer state.
+- Triage: run `pr-feedback-triage` for the same PR against its latest live state under the remaining finite restart bound. Continue only after `STATUS: complete`; retain its exact final head and complete final feedback snapshot directly in the shared top-level context. `awaiting_re_review` remains a parent-level reviewer/merge blocker and must not be cleared by mutating reviewer state.
 
 ## Limits
 
-The composite loop requires separate finite review-round and triage-restart budgets supplied by the caller or enforced by the runtime. If either loop has no finite bound, report `unsupported` before entering that loop. Do not infer one budget from the other.
+The composite loop requires separate finite bounds for review rounds and triage restarts, supplied by the caller or enforced by the runtime. A bound may be an explicit count or an equivalent overall execution deadline/policy that prevents indefinite looping. If either loop is effectively unbounded, report `unsupported` before entering it. Do not infer one bound from the other.
 
-One review round is one frozen-head review followed by triage until the live state matches a triage-complete snapshot. Maintain the triage restart counter in the shared top-level context across triage reinvocations within that round. Every transition from an analyzed or completed triage state back to a fresh triage snapshot consumes one restart, whether detected inside `pr-feedback-triage` or by the parent post-triage check.
+One review round is one frozen-head review followed by triage until the live state matches a triage-complete snapshot. Maintain restart accounting in the shared top-level context across triage reinvocations within that round. Every transition from an analyzed or completed triage state back to a fresh triage snapshot consumes one restart when a numeric limit is used and remains subject to the equivalent runtime bound otherwise.
 
 ## Flow
 
@@ -36,7 +36,7 @@ flowchart TD
   S{Starting point} -->|Issue| I[Run issue-to-pr]
   S -->|Existing PR| A[Freeze current head]
   I --> J{Complete?}
-  J -->|no| X[Stopped]
+  J -->|no| X[Stopped or unsupported]
   J -->|yes| A
   A --> B[Run pr-review on frozen head]
   B --> C{Reviewed exact head?}
@@ -45,10 +45,10 @@ flowchart TD
   D --> E{Complete?}
   E -->|no| X
   E -->|yes| F{Fresh live state equals triage-complete snapshot?}
-  F -->|no, restart remains| D
+  F -->|no, bound permits| D
   F -->|no, exhausted| X
   F -->|yes| G{Final head equals reviewed head?}
-  G -->|no, round remains| A
+  G -->|no, bound permits| A
   G -->|no, exhausted| X
   G -->|yes| H{Reviewer or merge blocker?}
   H -->|yes| X
@@ -60,7 +60,7 @@ The post-triage check re-fetches the live PR head and complete relevant paginate
 ## Outcomes
 
 - `success`: the fresh live state equals the latest triage-complete snapshot, its head equals the latest verified reviewed head, and no parent-level reviewer/merge blocker remains.
-- `stopped`: a sibling phase, state validation, permission, exhausted finite budget, or reviewer/merge blocker prevents success.
+- `stopped`: a sibling phase, state validation, permission, exhausted finite bound, or reviewer/merge blocker prevents success.
 - `unsupported`: the runtime cannot provide a required bounded execution or sibling procedure reports an unsupported capability.
 
 ## Output
