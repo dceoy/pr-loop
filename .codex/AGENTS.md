@@ -16,10 +16,11 @@ Use these model defaults and escalate only when the stated work requires it:
 
 - `planner`: `gpt-5.6-terra`; use `gpt-5.6-sol` for architecture, public interfaces, schemas, migrations, security boundaries, broad cross-cutting behavior, or unusually regression-prone planning.
 - `advisor`: `gpt-5.6-sol`.
-- `reviewer` / `correctness`: `gpt-5.6-terra`; use Sol for difficult state transitions, concurrency, large refactors, or cross-component invariants.
-- `reviewer` / `tests/docs`: `gpt-5.6-luna`; use Terra when verification, compatibility, or documentation behavior requires substantial code reasoning.
-- `reviewer` / `security/performance`: `gpt-5.6-terra`; use Sol for authentication, authorization, secrets, untrusted input, CI or privilege boundaries, concurrency, resource exhaustion, or similarly high-risk analysis.
-- `reviewer` / other caller-defined lens or scope: `gpt-5.6-terra`; use Sol when the review is materially difficult, high-risk, cross-cutting, or otherwise quality-critical.
+- `reviewer`: choose the model from the task's hardest selected lens and concrete risk, not from a fixed review slot:
+  - use `gpt-5.6-luna` for documentation, comments, or narrowly scoped test-coverage tasks that need little implementation reasoning;
+  - use `gpt-5.6-terra` by default for correctness, errors, types, compatibility, simplification, ordinary performance, and code-reasoning-heavy test or documentation tasks;
+  - use `gpt-5.6-sol` for authentication, authorization, secrets, untrusted-input or privilege boundaries, migrations, concurrency, difficult state transitions, cross-component invariants, resource exhaustion, broad scalability analysis, or similarly high-risk review work.
+  - when a task combines lenses, select the highest tier justified by any material risk in that task.
 - `feedback-analyst`: `gpt-5.6-luna`; use Terra when feedback conflicts, root-cause grouping is ambiguous, or dispositions require non-trivial code reasoning. Use `advisor` instead for architecture-level or other consequential judgment.
 
 After selecting the model, choose effort for cost/performance as follows:
