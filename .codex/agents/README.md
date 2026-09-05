@@ -4,7 +4,7 @@ These optional project-scoped TOML files define four reusable native read-only C
 
 - `planner`: decision-complete implementation planning.
 - `advisor`: on-demand technical advice or implementation review.
-- `reviewer`: one caller-defined risk task with dynamically selected review lenses against an exact revision.
+- `reviewer`: one caller-defined PR-review discovery or validation task against an exact revision.
 - `feedback-analyst`: source-preserving feedback disposition and fix guidance.
 
 Implementation remains owned by the top-level main agent. Named agents are fresh-context terminal leaves and must not modify files or dispatch another subagent.
