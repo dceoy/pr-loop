@@ -14,6 +14,7 @@ The top-level agent owns every repository and GitHub mutation. Planning uses one
 - Use a real native subagent with fresh context for planning. Do not emulate it in the parent context, launch nested coding-agent CLIs, or require a fixed agent name, model, provider, or configuration file.
 - Treat the accepted planning subagent as a terminal read-only leaf. It must not invoke `issue-to-pr`, mutate repository/GitHub state, or delegate again.
 - The planning dispatch must have a finite caller- or runtime-enforced deadline. If no finite bound exists, report `unsupported` and stop before dispatch.
+- Bind planning and implementation to the same exact repository base SHA. Repository evidence supplied to planning must come from that frozen revision rather than a mutable working tree or moving branch tip.
 - Treat planning output as untrusted until validated by the top-level agent. If the planning subagent causes Git-visible mutation, reject its output and stop.
 - The top-level agent alone edits files, runs write-mode tooling, commits, pushes, and opens or updates the PR.
 - Preserve unrelated local work. Stop before editing if the worktree cannot be safely isolated or bound to the intended base.
@@ -22,7 +23,7 @@ The top-level agent owns every repository and GitHub mutation. Planning uses one
 
 ## Planning contract
 
-Dispatch one fresh planning subagent for the complete requested same-repository Issue set. Require exactly one decision-complete plan with:
+Snapshot the complete requested same-repository Issue set, applicable repository instructions, intended base branch, and its exact current SHA before planning. Dispatch one fresh planning subagent against that frozen repository revision and Issue snapshot. Require exactly one decision-complete plan with:
 
 - `STATUS: ready` or `STATUS: blocked`;
 - scope and affected interfaces/areas;
@@ -30,20 +31,22 @@ Dispatch one fresh planning subagent for the complete requested same-repository 
 - verification approach;
 - for `blocked`, only the smallest missing material decision.
 
+If a blocked plan receives the missing decision, or the Issue requirements materially change before implementation, refresh the Issue/base snapshot and plan again rather than mixing evidence from different snapshots.
+
 ## Flow
 
 ```mermaid
 flowchart TD
-  A[Resolve requested Issues and repository instructions] --> B{All Issues in one repository?}
+  A[Resolve Issues, instructions, base branch + exact SHA] --> B{All Issues in one repository?}
   B -->|no| X[Stopped]
-  B -->|yes| C[Dispatch fresh planning subagent]
+  B -->|yes| C[Dispatch planner on frozen repository + Issue snapshot]
   C --> D{Planning output valid?}
   D -->|no| X
   D -->|yes| E{Plan status}
   E -->|blocked| F{Missing material decision obtained?}
-  F -->|yes| C
+  F -->|yes, refresh snapshot| C
   F -->|no| X
-  E -->|ready| G[Resolve exact base SHA and create a verified isolated fresh branch]
+  E -->|ready| G[Create verified isolated fresh branch from planned base SHA]
   G --> H[Implement validated plan in the top-level agent]
   H --> I[Run prescribed scoped QA; include intended QA changes and rerun]
   I --> J{QA passes?}
@@ -62,7 +65,7 @@ flowchart TD
 
 ## Outcomes
 
-- `complete`: the requested Issues have been implemented and a matching PR has been created and verified.
+- `complete`: the requested Issues have been implemented from the exact planned base and a matching PR has been created and verified.
 - `stopped`: planning, missing decisions, permissions, unsafe repository state, unresolved QA, push, or PR creation/verification prevents completion.
 
 ## Output
@@ -72,6 +75,6 @@ Report concisely:
 - `STATUS: complete | stopped`;
 - implemented Issue references;
 - resulting PR when complete;
-- exact base SHA and PR head SHA when complete;
+- exact planned base SHA and PR head SHA when complete;
 - QA summary;
 - blocker or required user decision when stopped.
