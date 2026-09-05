@@ -16,7 +16,8 @@ The top-level agent owns every repository and GitHub mutation. Planning and feed
 - Every accepted subagent dispatch must have a finite caller- or runtime-enforced deadline. If no finite bound exists, report `unsupported` and stop before dispatch.
 - Do not retry ambiguously accepted work. A still-running poll is not failure; wait for the same accepted dispatch until it terminates or its deadline expires.
 - If an accepted read-only subagent causes Git-visible mutation, reject its output. Recovery is allowed only when a pre-dispatch snapshot proves exact restoration of HEAD, index, tracked worktree, and non-ignored untracked state; no external side effect occurred; the target head is unchanged; and every advisory sibling that may have observed the mutation is cancelled or reaped and discarded. Restore and redispatch the whole affected advisory set at most once for that head. Otherwise stop.
-- Bind every review and feedback decision to an exact PR head SHA. If the head changes before an action based on that decision, discard the stale result and restart from the new head.
+- Bind each `pr-review` publication to its frozen reviewed head. A review already published for an older head remains valid historical feedback, but if the live head differs after review, do not analyze that review as current or act on its feedback; restart review on the new head first.
+- Bind every feedback disposition, fix, reply, and resolution to the exact reviewed head. If the head changes before one of those actions, discard the stale decision and restart review from the new head.
 - Treat subagent output as advisory. The top-level agent validates plans, review results, feedback dispositions, repository state, and GitHub state before acting.
 - The top-level agent alone edits files, runs write-mode tooling, commits, pushes, opens or updates PRs, publishes reviews, replies, and resolves threads.
 - Keep implementation and fixes scoped. Apply KISS, DRY, and YAGNI; prefer the smallest coherent change and avoid speculative abstraction or unrelated cleanup.
@@ -42,19 +43,21 @@ For each recorded PR head SHA, read and execute [`../pr-review/SKILL.md`](../pr-
 
 Require:
 
-- the exact PR and recorded head SHA as a hard target;
-- publication enabled and exactly one verified `COMMENT` review;
+- the exact PR and recorded head SHA as the frozen review target;
+- publication enabled and exactly one verified `COMMENT` review bound to that reviewed SHA;
 - fresh direct discovery and validation subagents governed by `pr-review`;
 - no nested invocation of `pr-review` as a subagent;
 - a composed result with `STATUS`, `REVIEWED_HEAD`, `PUBLISHED_FINDINGS`, `PUBLICATION_VERIFIED`, and `RUN_MARKER`.
 
-Accept the phase only when `STATUS: reviewed`, `REVIEWED_HEAD` equals the recorded head exactly, and `PUBLICATION_VERIFIED: true`. Treat `stale` as a signal to restart on the current head. Treat `unsupported` or `failed` as a blocker unless the read-only mutation recovery invariant above applies.
+Accept the phase only when `STATUS: reviewed`, `REVIEWED_HEAD` equals the recorded head exactly, and `PUBLICATION_VERIFIED: true`. Treat `unsupported` or `failed` as a blocker unless the read-only mutation recovery invariant above applies.
+
+The bundled `pr-review` skill owns review-snapshot analysis and publication. It does not decide whether a newer live PR head requires another review; `pr-loop` owns that decision after `pr-review` returns.
 
 The bundled `pr-review` skill is the source of truth for risk mapping, adaptive reviewer selection, candidate discovery, independent validation, finding arbitration, inline placement, COMMENT publication, and review verification. Do not duplicate those policies here.
 
 ### Feedback analysis
 
-After each accepted review phase, snapshot every current feedback source and dispatch one fresh feedback-analysis subagent:
+After each accepted review phase whose reviewed head is still the live PR head, snapshot every current feedback source and dispatch one fresh feedback-analysis subagent:
 
 - inline threads/comments: `thread:<id>`;
 - PR-level comments: `comment:<id>`;
@@ -87,11 +90,13 @@ Verify that current authentication can read the feedback needed by the loop befo
 
 ### 2. Review the exact head
 
-Invoke the bundled `pr-review` procedure for the recorded SHA with publication required.
+Invoke the bundled `pr-review` procedure for the recorded SHA with publication required. `pr-review` completes and publishes against that frozen SHA even if the live PR head changes while review work is running.
 
-If its result is `stale`, discard the review phase and restart from the current head; the attempt still counts. If it returns `reviewed`, require the exact recorded SHA and verified publication before continuing.
+If `pr-review` returns `unsupported` or `failed`, stop unless the read-only mutation recovery invariant applies. If it returns `reviewed`, require `REVIEWED_HEAD` to equal the recorded SHA and require verified publication.
 
-Initialize `head_changed_since_review` to `false` after an accepted review. Whenever the loop later observes a different head SHA, set it to `true` and never clear it for that attempt even if a later fetch returns to the reviewed SHA.
+Immediately after an accepted review, re-fetch the live PR head before feedback analysis. If it differs from the reviewed SHA, keep the historical review that was just published, count the attempt, freeze the new live head, and invoke `pr-review` again. Do not analyze, fix, reply to, or resolve feedback from the older head as current work.
+
+Only when the live head still equals the reviewed SHA, initialize `head_changed_since_review` to `false` and continue. Whenever the loop later observes a different head SHA, set the flag to `true` and never clear it for that attempt even if a later fetch returns to the reviewed SHA.
 
 ### 3. Analyze all feedback
 
@@ -151,7 +156,7 @@ flowchart TD
   M --> N[Push and open PR]
   N --> A[Freeze PR head SHA]
   A --> B[Run bundled pr-review]
-  B --> C{Exact head reviewed?}
+  B --> C{Live head still reviewed SHA?}
   C -->|no| A
   C -->|yes| D[Analyze all feedback]
   D --> E{State changed?}

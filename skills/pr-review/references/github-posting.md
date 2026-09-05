@@ -4,7 +4,7 @@ The top-level parent is the only actor allowed to publish PR-review feedback.
 
 ## Posting contract
 
-Unless the user selected `dry-run` or `no-post`, the review is incomplete until GitHub has accepted and persisted exactly one `COMMENT` pull-request review for the frozen reviewed head.
+Unless the user selected `dry-run` or `no-post`, the review is incomplete until GitHub has accepted and persisted exactly one `COMMENT` pull-request review explicitly bound to the frozen reviewed head.
 
 Every review has a non-empty top-level body, including a clean review, and contains fresh run markers:
 
@@ -19,11 +19,11 @@ Use a new marker for every invocation so an older review cannot satisfy verifica
 
 Never mix analysis from different head SHAs.
 
-When a caller supplied an exact target head, immediately re-fetch the live PR head before publication regardless of commit-bound publication support. If the live head differs from the requested target, return `stale` without publishing. This preserves caller workflows that require stale review decisions to be discarded before any GitHub mutation.
+Bind publication to the frozen reviewed commit. A live PR head change does not cancel, restart, or retarget the review; publish the completed findings to the reviewed head even when GitHub renders the resulting review or inline comments as outdated.
 
-In standalone mode, if the runtime can explicitly bind review publication to the frozen reviewed commit, publish against that exact commit even when the live PR head has advanced; GitHub may render that review as outdated. If commit-bound publication is unavailable, immediately re-fetch the live head before posting and restart against the new snapshot when it differs from the reviewed head.
+Do not fall back to an unbound review against the current live head. When publication is required and the runtime cannot explicitly target the frozen reviewed commit, the review is `unsupported` and should have stopped before discovery.
 
-Immediately before mutation, re-fetch current review feedback and drop findings already clearly covered so concurrent reviews are not duplicated.
+Immediately before mutation, re-fetch current review feedback only for duplicate suppression. Do not use newer-head content to alter the frozen analysis, and drop a finding only when existing feedback clearly covers the same root cause on the reviewed snapshot.
 
 ## Inline vs top-level
 
@@ -45,7 +45,7 @@ Do not imply approval or resolution of unrelated existing feedback.
 
 ## Verification
 
-After submission, re-fetch reviews and inline comments. Success requires evidence that the specific current-run COMMENT review persisted, is associated with the reviewed head when GitHub exposes that metadata, contains the intended top-level body and fresh run marker, and includes every intended inline comment at the expected location.
+After submission, re-fetch reviews and inline comments. Success requires evidence that the specific current-run COMMENT review persisted, is associated with the frozen reviewed head when GitHub exposes that metadata, contains the intended top-level body and fresh run marker, and includes every intended inline comment at the expected location.
 
 A returned review ID is useful but does not replace current-run marker verification. Do not treat process exit status, HTTP success alone, stdout, or the parent's final response as proof of publication.
 
