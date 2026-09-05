@@ -53,7 +53,7 @@ EVIDENCE
 REMEDIATION
 ```
 
-If no candidate exists, return exactly `CANDIDATES: none` so an empty result cannot be confused with a failed or truncated dispatch. The worker must not force a finding. Discovery confidence is provisional and never bypasses validation.
+For no findings, the portable default is exactly `CANDIDATES: none`. A successfully completed native project/runtime role may instead use its documented clean-empty convention, including returning zero candidate records, when the orchestrator can unambiguously distinguish successful completion from missing or truncated output using the dispatch result and applicable role contract. Treat an otherwise ambiguous empty result as failed rather than clean. The worker must not force a finding. Discovery confidence is provisional and never bypasses validation.
 
 ## Validation output
 
