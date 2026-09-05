@@ -24,13 +24,21 @@ An orchestrator coordinates the procedure and owns commit, push, PR creation, an
 
 ## Planning contract
 
-Snapshot the complete requested same-repository Issue set, applicable repository instructions, intended base branch, and its exact current SHA before planning. Produce exactly one decision-complete plan against that frozen repository revision and Issue snapshot, either directly in the orchestrator or through a compatible delegated planner selected by project/runtime routing. Require:
+Snapshot the complete requested same-repository Issue set, applicable repository instructions, intended base branch, and its exact current SHA before planning. Produce exactly one result against that frozen repository revision and Issue snapshot, either directly in the orchestrator or through a compatible delegated planner selected by project/runtime routing.
 
-- `STATUS: ready` or `STATUS: blocked`;
+A ready result is decision-complete and contains:
+
+- `STATUS: ready`;
 - scope and affected interfaces/areas;
 - concrete implementation decisions and constraints;
-- verification approach;
-- for `blocked`, only the smallest missing material decision.
+- verification approach.
+
+A blocked result contains only the unresolved material decision needed to continue:
+
+```text
+STATUS: blocked
+QUESTION: <smallest missing material decision>
+```
 
 If a blocked plan receives the missing decision, or the Issue requirements materially change before implementation, refresh the Issue/base snapshot and plan again rather than mixing evidence from different snapshots.
 
