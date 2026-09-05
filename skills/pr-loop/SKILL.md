@@ -74,7 +74,7 @@ Give each reviewer the exact head SHA, changed files and relevant diff, plus onl
 - PR intent and applicable constraints;
 - relevant verification evidence and existing feedback when useful.
 
-Reviewer tasks return findings only; they never publish them. Candidate findings must include role, selected lenses, severity (`critical`, `high`, `medium`, `low`), confidence, concrete impact, remediation direction, and a file/line anchor when safe.
+Reviewer tasks return findings only; they never publish them. Candidate findings must include role, selected lenses, `ROOT_CAUSE`, `EVIDENCE`, severity (`critical`, `high`, `medium`, `low`), confidence, concrete impact, remediation direction, and a file/line anchor when safe.
 
 The top-level agent deduplicates by root cause and drops stale, speculative, style-only, unrelated, or low-confidence findings. Apply lens-specific evidence gates before publication: security findings need a concrete trust-boundary path and must account for framework protections; performance findings need a credible workload or resource impact; test findings need a specific important regression current tests could miss; compatibility and documentation findings need a concrete changed contract; simplification findings need concrete unnecessary complexity, duplication, or speculative functionality and the smallest coherent remediation.
 
