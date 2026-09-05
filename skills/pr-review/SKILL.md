@@ -60,7 +60,7 @@ flowchart TD
 
 ## Review procedure
 
-Read [references/review-lenses.md](references/review-lenses.md) to select the smallest credible risk-driven discovery set. Read [references/finding-validation.md](references/finding-validation.md) before validation and orchestrator arbitration. Do not validate when every successful discovery task returns `CANDIDATES: none`.
+Read [references/review-lenses.md](references/review-lenses.md) to select the smallest credible risk-driven discovery set. Read [references/finding-validation.md](references/finding-validation.md) before validation and orchestrator arbitration. Do not validate when every successful discovery task yields no candidates under an accepted clean-empty convention defined by the delegated-analysis contract.
 
 Publish only confirmed, non-duplicate, PR-scoped findings with credible material impact and proportional remediation. A `needs-human` item may survive only as a concise top-level verification note when one unresolved external fact itself creates material merge risk. Normally publish critical/high and concrete medium findings; suppress low findings unless project policy requires them.
 
