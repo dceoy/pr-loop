@@ -2,7 +2,7 @@
 
 > GitHub-native, race-safe Agentic Issue-Driven Development orchestrator.
 
-`pr-loop` turns GitHub Issues into reviewed pull requests and drives existing pull requests through review, fixes, and re-review until no actionable feedback or reviewer-blocked state remains.
+`pr-loop` turns GitHub Issues into reviewed pull requests and drives existing pull requests through review, live-head feedback triage, fixes, and re-review until the final head is reviewed and no actionable or reviewer-blocked state remains.
 
 It uses a single-writer multi-agent model: fresh native subagents plan, review, and analyze feedback, while the top-level agent alone mutates the repository and GitHub state.
 
@@ -14,33 +14,36 @@ flowchart LR
   Q -->|Ready| M[Implement + QA] --> PR[Pull request]
   Q -->|Cannot proceed| T[Stopped]
 
-  PR --> R[Bundled pr-review] --> N{Next step?}
-  N -->|Fix| X[Fix + QA]
-  X --> R
-  N -->|Stop| T
-  N -->|Finish| S[Success]
+  PR --> R[Bundled pr-review]
+  R --> F[Bundled pr-feedback-triage<br/>on latest live head]
+  F --> H{Final head changed?}
+  H -->|Yes| R
+  H -->|No| B{Reviewer or merge blocker?}
+  B -->|Yes| T
+  B -->|No| S[Success]
 ```
 
 For an existing pull request, the loop starts at review.
 
-The review phase is provided by the bundled [`pr-review`](skills/pr-review/SKILL.md) skill. `pr-loop` executes that procedure in the same top-level agent context rather than launching it as a nested subagent, so review discovery and independent validation remain direct fresh read-only leaves while the single-writer boundary stays intact. The bundled skill can also be used standalone.
+The review phase is provided by the bundled [`pr-review`](skills/pr-review/SKILL.md) skill. `pr-loop` executes that procedure in the same top-level agent context rather than launching it as a nested subagent, so review discovery and independent validation remain direct fresh read-only leaves while the single-writer boundary stays intact.
 
-When composed by `pr-loop`, `pr-review` completes one frozen-head review and publishes it explicitly against that exact commit even if the live PR head advances. After it returns, `pr-loop` re-checks the live head; when it changed, the historical review remains posted and `pr-loop` immediately runs `pr-review` again for the new head before feedback analysis or fixes. Standalone `pr-review` prefers the same commit-bound publication, but when the runtime cannot target historical commits it may safely fall back to current-head publication only after confirming the live head still equals the frozen snapshot; otherwise it restarts on the new head.
+Feedback handling is provided by the bundled [`pr-feedback-triage`](skills/pr-feedback-triage/SKILL.md) skill, based on the merged `dceoy/ai-coding-agent-skills` version and hardened here for composed race-safety. It is also executed in the top-level context and owns feedback analysis, focused fixes, QA, commit/push, replies, resolutions, and reconciliation.
 
-Reviews are selected adaptively from the change and risk map rather than using a fixed reviewer set. Unscoped reviews retain baseline correctness, regression, tests, and documentation coverage, while conditional lenses are added only when the PR justifies them. Candidate findings are independently validated before publication, and explicit review scopes remain hard constraints.
+`pr-review` completes one frozen-head review and publishes it explicitly against that exact commit even if the live PR head advances. After it returns, `pr-loop` does not force another review before feedback handling: `pr-feedback-triage` starts from the latest live head and follows further head or feedback changes until triage completes. If triage finishes on a head different from the reviewed SHA, `pr-loop` starts another review round on that final head. This guarantees that the final head is reviewed before success without interrupting live-head triage.
 
-Feedback is classified into concrete dispositions such as `fix`, `already addressed`, `outdated`, `answer`, `clarify`, `defer`, or `won't fix`.
+Reviews are selected adaptively from the change and risk map rather than using a fixed reviewer set. Candidate findings are independently validated before publication. Feedback is classified into concrete dispositions such as `fix`, `already addressed`, `outdated`, `answer`, `clarify`, `defer`, or `won't fix`.
 
 ## Race-safety
 
 - **Single writer:** only the top-level agent edits, commits, pushes, publishes reviews, replies, or resolves threads.
-- **Frozen-head review:** each `pr-loop` review is published for exactly one frozen head SHA; a live-head change triggers another review instead of cancelling the completed historical review.
-- **Fresh-state actions:** feedback analysis, fixes, replies, and thread resolution proceed only while the live head still matches the reviewed SHA.
-- **Stable feedback:** feedback is snapshotted and re-analyzed when external comments, reviews, or threads change.
+- **Frozen-head review:** each review is published for exactly one frozen head SHA and remains valid historical feedback if the head later advances.
+- **Live-head triage:** feedback triage follows the latest live head without requiring an intervening review and discards stale prepared work whenever head or feedback state changes.
+- **Safe publication:** fix batches use an isolated worktree rooted at the analyzed head, exact head+feedback gates before mutation and push, and an expected-SHA lease so a changed remote ref cannot be overwritten or resurrect stale commits.
+- **Final-head review:** when triage changes the head, the resulting stable head starts the next review round before success.
 - **Fresh advisors:** planning, review discovery/validation, and feedback analysis run in independent read-only subagents with fresh context.
-- **Fail closed:** the loop stops on ambiguous state, unsafe worktrees, unavailable required subagents, failed QA, or unresolved blocking reviewer state.
+- **Fail closed:** the loop stops on ambiguous state, unsafe worktrees, unavailable required subagents, failed QA/publication, exhausted caller limits, or unresolved reviewer/merge blockers.
 
-Success requires the final exact head to have a verified review, reconciled feedback, and no actionable or reviewer-blocked item remaining.
+Success requires the stable live head to equal the latest verified reviewed head, bundled feedback triage to have completed for that state, and no parent-level blocker such as `awaiting_re_review` to remain.
 
 ## Agent routing
 
@@ -57,9 +60,10 @@ For each advisory role, `pr-loop` prefers a matching user-defined native agent, 
 Implement https://github.com/OWNER/REPO/issues/123 with pr-loop
 Run pr-loop on https://github.com/OWNER/REPO/pull/456
 Review https://github.com/OWNER/REPO/pull/456 with pr-review
+Triage https://github.com/OWNER/REPO/pull/456 with pr-feedback-triage
 ```
 
-See [`skills/pr-loop/SKILL.md`](skills/pr-loop/SKILL.md) for orchestration and [`skills/pr-review/SKILL.md`](skills/pr-review/SKILL.md) for the review procedure.
+See [`skills/pr-loop/SKILL.md`](skills/pr-loop/SKILL.md) for orchestration, [`skills/pr-review/SKILL.md`](skills/pr-review/SKILL.md) for review, and [`skills/pr-feedback-triage/SKILL.md`](skills/pr-feedback-triage/SKILL.md) for live-head feedback handling.
 
 ## Background
 
