@@ -18,7 +18,7 @@ The top-level agent owns every repository and GitHub mutation. Planning uses one
 - The top-level agent alone edits files, runs write-mode tooling, commits, pushes, and opens or updates the PR.
 - Preserve unrelated local work. Stop before editing if the worktree cannot be safely isolated or bound to the intended base.
 - Keep implementation scoped. Apply KISS, DRY, and YAGNI; prefer the smallest coherent change and avoid speculative abstraction or unrelated cleanup.
-- Create the remote implementation branch only when its ref is still absent; never update an existing remote branch or unrelated PR to make progress.
+- Publish the fresh remote branch with an atomic create-only guard that requires the destination ref to be absent (for Git, an explicit empty-expected-value `--force-with-lease=<ref>:` or equivalent API semantics). Never update an existing remote branch or unrelated PR; stop if the ref exists or is created concurrently, and verify the created ref points to the intended commit.
 
 ## Planning contract
 
@@ -30,19 +30,33 @@ Dispatch one fresh planning subagent for the complete requested same-repository 
 - verification approach;
 - for `blocked`, only the smallest missing material decision.
 
-If blocked, obtain the missing material decision and re-plan. Stop if it cannot be obtained without guessing.
+## Flow
 
-## Procedure
-
-1. Resolve the requested Issues, read their complete current state and relevant repository instructions, and require all Issues to belong to one repository.
-2. Dispatch planning and validate the returned plan against the Issues and repository state.
-3. Resolve the intended base branch and its exact current SHA. Require a clean isolatable worktree, create a fresh branch from that SHA, and verify the branch starts there.
-4. Implement the validated plan directly in the top-level agent. Do not delegate implementation.
-5. Run the repository-prescribed QA appropriate to the changed scope. If QA modifies intended files, include those changes and rerun the required checks. Stop on unresolved QA failure.
-6. Inspect the final diff for Issue scope and unrelated changes, then commit it.
-7. Publish the fresh branch with an atomic create-only guard that requires the destination remote ref not to exist (for Git, an explicit empty-expected-value `--force-with-lease=<ref>:` or equivalent API semantics). Stop if the remote ref already exists or is created concurrently, then verify the created remote ref points to the intended commit.
-8. Open a pull request against the intended base with the implemented Issues linked in its body. Re-fetch it and verify its repository, base, head ref, and head SHA match the created branch and commit.
-9. Stop. Do not invoke `pr-review`, `pr-feedback-triage`, or any other review loop.
+```mermaid
+flowchart TD
+  A[Resolve requested Issues and repository instructions] --> B{All Issues in one repository?}
+  B -->|no| X[Stopped]
+  B -->|yes| C[Dispatch fresh planning subagent]
+  C --> D{Planning output valid?}
+  D -->|no| X
+  D -->|yes| E{Plan status}
+  E -->|blocked| F{Missing material decision obtained?}
+  F -->|yes| C
+  F -->|no| X
+  E -->|ready| G[Resolve exact base SHA and create a verified isolated fresh branch]
+  G --> H[Implement validated plan in the top-level agent]
+  H --> I[Run prescribed scoped QA; include intended QA changes and rerun]
+  I --> J{QA passes?}
+  J -->|no| X
+  J -->|yes| K[Inspect final scoped diff and commit]
+  K --> L[Atomically create remote branch and verify its commit]
+  L --> M{Published safely?}
+  M -->|no| X
+  M -->|yes| N[Open PR linking implemented Issues and re-fetch it]
+  N --> O{Repository, base, head ref, and head SHA match?}
+  O -->|no| X
+  O -->|yes| P[Complete]
+```
 
 ## Outcomes
 
