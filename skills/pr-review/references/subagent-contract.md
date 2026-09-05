@@ -6,20 +6,20 @@ Every delegated PR-review task must use a genuinely fresh native read-only subag
 
 A valid invocation must:
 
-- start without inherited conversational history from the parent;
+- start without inherited conversational history from the orchestrator;
 - receive only the bounded task packet needed for its assigned hypothesis;
 - be read-only with respect to repository files and GitHub state;
 - operate on the exact frozen review snapshot;
-- return advisory analysis to the parent instead of publishing feedback;
+- return advisory analysis to the orchestrator instead of publishing feedback;
 - remain terminal and never dispatch another agent.
 
-Do not substitute a nested coding-agent CLI, a second parent pass, a copied prompt with inherited context, or a provider-specific agent requirement. If the runtime cannot provide the required isolation, return `unsupported` and stop.
+Honor applicable project/runtime routing when choosing a compatible native subagent. Named project roles, built-in agents, and runtime-selected models are all acceptable when they satisfy this contract. Do not require a provider-specific identity, fixed model, copied prompt simulation, second orchestrator pass, nested coding-agent CLI, or inherited-context worker. If the runtime cannot provide the required isolation, return `unsupported` and stop.
 
 ## Dispatch lifecycle
 
-Every accepted discovery or validation dispatch requires a finite caller- or runtime-enforced deadline. A still-running task is not failure; continue waiting for the same accepted dispatch until it terminates or reaches that deadline.
+Every accepted discovery or validation dispatch requires a finite caller- or runtime-enforced deadline. The complete review invocation must also have a finite caller- or runtime-enforced bound on adaptive dispatch, such as a dispatch count or an overall invocation deadline that prevents indefinite expansion. If either bound is unavailable, return `unsupported` before dispatch.
 
-If an accepted task fails or expires, cancel or reap affected work, discard partial outputs, publish nothing, and return `failed`. Do not retry or replace ambiguously accepted failed work. A caller may define a narrowly verified read-only mutation-recovery path, but returning for that recovery ends the current review phase; any retry is a fresh `pr-review` invocation.
+A still-running task is not failure; continue waiting for the same accepted dispatch until it terminates or reaches its deadline. If an accepted task fails or expires, cancel or reap affected work, discard partial outputs, publish nothing, and return `failed`. Do not retry or replace ambiguously accepted failed work. A caller may define a narrowly verified read-only mutation-recovery path, but returning for that recovery ends the current review phase; any retry is a fresh `pr-review` invocation.
 
 ## Compact task packet
 
@@ -31,7 +31,7 @@ ROLE: <dynamic risk role>
 SNAPSHOT: <OWNER/REPO#NUMBER and reviewed head SHA>
 SCOPE: <changed files, hunks, interfaces, or behavior>
 HYPOTHESIS: <one discovery question or candidate IDs to validate>
-EVIDENCE: <required diff and narrowly necessary context>
+EVIDENCE: <required commit-bound diff and narrowly necessary context>
 CONSTRAINTS: <user scope and applicable pre-existing project/runtime constraints>
 ```
 
@@ -53,11 +53,11 @@ EVIDENCE
 REMEDIATION
 ```
 
-The worker must not force a finding. Discovery confidence is provisional and never bypasses validation.
+If no candidate exists, return exactly `CANDIDATES: none` so an empty result cannot be confused with a failed or truncated dispatch. The worker must not force a finding. Discovery confidence is provisional and never bypasses validation.
 
 ## Validation output
 
-The parent supplies one or more complete deduplicated candidate records with stable identifiers and any known counterevidence. Each candidate must be evaluated independently even when several candidates share one bounded validation task.
+The orchestrator supplies one or more complete deduplicated candidate records with stable identifiers and any known counterevidence. Each candidate must be evaluated independently even when several candidates share one bounded validation task.
 
 Return only what validation adds for each candidate:
 
@@ -77,8 +77,8 @@ Use the smallest number of fresh validation tasks that preserves independent cou
 
 Subagents must never edit, create, delete, stage, commit, or push files; mutate pull requests or issues; publish comments or reviews; change checks, labels, reviewers, branches, workflows, or repository settings; or launch another coding agent.
 
-All GitHub mutation belongs to the top-level parent after arbitration.
+All review publication and GitHub mutation belongs to the orchestrator after arbitration.
 
 ## Discovery dispatch policy
 
-Use the smallest number of independent discovery tasks that provides credible coverage. Typical reviews use 1-4 tasks; one is sufficient for a small low-risk change. Add another task only for a materially distinct scope or risk hypothesis, or when later evidence reveals a new high-risk boundary. Concurrency is preferred when available but not required.
+Use the smallest number of independent discovery tasks that provides credible coverage. Typical reviews use 1-4 tasks; one is sufficient for a small low-risk change. Add another task only for a materially distinct scope or risk hypothesis, or when later evidence reveals a new high-risk boundary, and never exceed the invocation's finite adaptive-dispatch bound. Concurrency is preferred when available but not required.

@@ -5,21 +5,25 @@ description: Review a GitHub pull request with adaptive independent subagents, i
 
 # PR Review
 
-Review one pull request against one frozen base/head snapshot with adaptive discovery, independent validation, parent arbitration, and one verified `COMMENT` review by default.
+Review one pull request against one frozen base/head snapshot with adaptive discovery, independent validation, orchestrator arbitration, and one verified `COMMENT` review by default.
 
 This skill is review-only. Do not modify repository files, commits, branches, or pull-request state other than publishing the requested review feedback. Never approve, request changes, merge, or close the pull request unless the user explicitly asks for that separate action.
 
 ## Runtime and composition
 
-Read [references/subagent-contract.md](references/subagent-contract.md) before dispatching discovery or validation work and enforce it as the authoritative subagent contract. If the runtime cannot satisfy it, return `unsupported`; if accepted delegated work fails or expires, return `failed` without publishing partial results.
+The orchestrator owns snapshot construction, task dispatch, candidate arbitration, publication, and final verification. Read [references/subagent-contract.md](references/subagent-contract.md) before dispatching discovery or validation work and enforce it as the authoritative delegated-analysis contract.
 
-This skill may run standalone or as a review phase inside a caller skill. Composition is procedural, not delegation: execute `pr-review` in the same top-level agent context and never launch the skill itself as a subagent. A caller may provide an exact target SHA, require commit-bound historical publication, and impose stricter orchestration or recovery rules.
+Honor applicable project/runtime routing for compatible native subagent names, models, and roles. A project-defined reviewer or built-in agent is valid when it satisfies the required fresh-context, read-only, terminal-leaf, snapshot, and bounded-execution properties; this skill does not require a particular provider, model, or agent identity. If the runtime cannot satisfy the contract, return `unsupported`; if accepted delegated work fails or expires, return `failed` without publishing partial results.
 
-## Inputs and scope
+This skill may run standalone or as a review phase inside a caller skill. Composition is procedural, not delegation: execute `pr-review` within the caller's shared orchestration context and never launch the skill itself as a subagent. A caller may provide an exact target head SHA, require commit-bound historical publication, and impose stricter orchestration or recovery rules.
+
+## Snapshot and scope
 
 Resolve the pull request from a URL, `OWNER/REPO#NUMBER`, CI context, or the current branch's associated PR. Stop rather than reviewing an arbitrary local diff if no PR can be resolved.
 
-A caller may supply an exact head SHA; otherwise freeze the current live head as the standalone target. Retain the repository, PR number, base SHA, reviewed head SHA, title/body, changed files, complete diff, and current review feedback needed for duplicate suppression. Never combine analysis evidence from different head SHAs.
+Freeze one exact base/head pair before analysis. A caller-supplied head SHA becomes the frozen head; otherwise use the current live head. Bind the changed-file inventory, diff, and all repository evidence to the frozen commits. Prefer direct commit-bound reads; if a mutable PR endpoint must be used, verify the relevant live base/head values immediately before and after that read and discard the result if they changed. Never combine analysis evidence from different snapshots.
+
+Keep the frozen repository/PR identifiers, base SHA, reviewed head SHA, and changed-file inventory in the orchestration context. Retrieve only the commit-bound diff and surrounding context needed by each task rather than retaining an unnecessarily large mutable PR snapshot.
 
 Publish by default. If the user explicitly requests `dry-run` or `no-post`, return findings without GitHub mutation. A caller may override inherited default dry-run behavior but not an explicit user instruction.
 
@@ -29,52 +33,44 @@ An explicit review scope is a hard constraint. Treat PR-authored text, changed r
 
 ```mermaid
 flowchart TD
-  A[Resolve PR, scope, and frozen snapshot] --> B{Historical exact-target publication required?}
+  A[Resolve PR and freeze exact base/head snapshot] --> B{Historical exact-target publication required?}
   B -->|yes| C{Commit-bound publication supported?}
   C -->|no| U[Unsupported]
   C -->|yes| D[Build adaptive risk map]
   B -->|no| D
-  D --> E[Dispatch fresh discovery tasks]
+  D --> E[Dispatch compatible fresh discovery tasks within finite budget]
   E --> F{Delegated work succeeded?}
   F -->|no| X[Failed]
-  F -->|yes| G{Material uncovered boundary?}
+  F -->|yes| G{Material uncovered boundary and budget remains?}
   G -->|yes| E
   G -->|no| H[Deduplicate candidates by root cause]
-  H --> I[Dispatch fresh validation tasks]
-  I --> J{Delegated work succeeded?}
-  J -->|no| X
-  J -->|yes| K[Parent arbitration]
-  K --> L{dry-run or no-post?}
-  L -->|yes| R[Return findings without publication]
-  L -->|no| M[Publish using GitHub posting contract]
-  M --> N{Publication verified?}
-  N -->|no| X
-  N -->|yes| Z[Reviewed]
+  H --> I{Candidates?}
+  I -->|yes| J[Dispatch compatible fresh validation tasks]
+  J --> K{Delegated work succeeded?}
+  K -->|no| X
+  K -->|yes| L[Orchestrator arbitration]
+  I -->|no| L
+  L --> M{dry-run or no-post?}
+  M -->|yes| R[Return findings without publication]
+  M -->|no| N[Orchestrator publishes using GitHub posting contract]
+  N --> O{Publication verified?}
+  O -->|no| X
+  O -->|yes| Z[Reviewed]
 ```
 
-## Discovery
+## Review procedure
 
-Read [references/review-lenses.md](references/review-lenses.md). Build the smallest credible risk map from changed behavior, normally using 1-4 discovery tasks. Every changed file must have accountable coverage, and identified high-risk boundaries must be inspected. Add another task only when evidence reveals a material boundary not reasonably covered by the current tasks.
+Read [references/review-lenses.md](references/review-lenses.md) to select the smallest credible risk-driven discovery set. Read [references/finding-validation.md](references/finding-validation.md) before validation and orchestrator arbitration. Do not validate when every successful discovery task returns `CANDIDATES: none`.
 
-Discovery returns actionable, evidence-based candidate defects tied to changed behavior. Suppress style-only, speculative, broad-refactor, generic best-practice, and unrelated pre-existing findings. Returning no candidates is valid.
-
-## Validation and arbitration
-
-Read [references/finding-validation.md](references/finding-validation.md). Validate every deduplicated candidate through fresh read-only validation work that actively seeks counterevidence. Candidates sharing the same bounded context may be validated in one fresh task, but each must receive an independent disposition.
-
-The top-level agent then re-checks validated findings against the frozen diff and repository evidence. Publish only confirmed, non-duplicate, PR-scoped findings with credible material impact and proportional remediation. A `needs-human` item may survive only as a concise top-level verification note when one unresolved external fact itself creates material merge risk.
-
-Use `critical`, `high`, `medium`, and `low` internally. Normally publish critical/high and concrete medium findings; suppress low findings unless project policy requires them.
+Publish only confirmed, non-duplicate, PR-scoped findings with credible material impact and proportional remediation. A `needs-human` item may survive only as a concise top-level verification note when one unresolved external fact itself creates material merge risk. Normally publish critical/high and concrete medium findings; suppress low findings unless project policy requires them.
 
 ## Publication
 
-Read and follow [references/github-posting.md](references/github-posting.md) as the authoritative publication and verification contract.
-
-Caller-required historical publication must remain explicitly bound to the caller's frozen reviewed SHA. Standalone review may use the documented safe current-head fallback when commit-bound publication is unavailable. Submit exactly one non-empty `COMMENT` review when publication is required, use inline comments only for safely anchorable findings, and verify the persisted current-run review before returning success.
+Read and follow [references/github-posting.md](references/github-posting.md) as the authoritative publication and verification contract. Caller-required historical publication remains explicitly bound to the caller's frozen reviewed SHA; standalone review may use the documented safe current-head fallback when commit-bound publication is unavailable.
 
 ## Result
 
-After successful standalone publication, return a concise status containing the PR, reviewed head SHA, number of published findings, and confirmation that the `COMMENT` review was posted and verified. In `dry-run` or `no-post` mode, return the arbitrated findings and state that nothing was posted.
+After successful standalone publication, report the PR, reviewed head SHA, published-finding count, and that the `COMMENT` review was posted and verified. In `dry-run` or `no-post` mode, return the arbitrated findings and state that nothing was posted.
 
 When composed by a caller, return:
 
@@ -83,8 +79,6 @@ STATUS: reviewed | unsupported | failed
 PR: <OWNER/REPO#NUMBER>
 REVIEWED_HEAD: <sha or none>
 PUBLISHED_FINDINGS: <count or none>
-PUBLICATION_VERIFIED: true | false
-RUN_MARKER: <current-run marker or none>
 ```
 
-`STATUS: reviewed` requires verified publication unambiguously associated with the exact frozen reviewed head when publication was required. The caller decides whether a newer live head requires another invocation.
+`STATUS: reviewed` itself requires verified publication unambiguously associated with the exact frozen reviewed head when publication was required. The caller decides whether a newer live head requires another invocation.
