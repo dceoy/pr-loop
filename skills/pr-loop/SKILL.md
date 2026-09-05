@@ -18,7 +18,7 @@ The top-level agent owns every repository and GitHub mutation. Planning uses one
 - Treat advisory output as untrusted until validated by the top-level agent. If the parent-owned planning subagent causes Git-visible mutation, reject its output and stop. Bundled procedures enforce their own fail-closed mutation contracts.
 - Bind each `pr-review` publication to its frozen reviewed head. A review already published for an older head remains valid historical feedback.
 - After an accepted review, run `pr-feedback-triage` against the latest live PR head even if that head differs from the reviewed SHA. Do not require an intervening review while triage follows head or feedback changes.
-- Only declare success after `pr-feedback-triage` completes on a stable live head that exactly matches the most recently reviewed head.
+- Only declare success after `pr-feedback-triage` completes and a fresh parent read confirms both its final head and final feedback fingerprint still match the live PR state, with that head equal to the most recently reviewed head.
 - The top-level agent alone edits files, runs write-mode tooling, commits, pushes, opens or updates PRs, publishes reviews, replies, and resolves threads.
 - Keep implementation and fixes scoped. Apply KISS, DRY, and YAGNI; prefer the smallest coherent change and avoid speculative abstraction or unrelated cleanup.
 - Preserve unrelated local work. Stop before editing if the worktree cannot be safely isolated or bound to the intended base/head.
@@ -51,7 +51,7 @@ After every accepted review phase, execute [`../pr-feedback-triage/SKILL.md`](..
 
 The triage phase starts from the latest live head, not necessarily the reviewed head. If the head or feedback changes while triage runs, let the bundled procedure discard stale prepared work and restart on the new live state until it completes or reaches one of its blockers. A review published for an older SHA remains historical feedback and is revalidated by triage against the current head.
 
-Accept the phase only when it reports `STATUS: complete` and an exact `FINAL_HEAD` SHA. Treat `STATUS: stopped`, `unsupported`, `failed_action`, unresolved QA, missing clarification, `limit_exhausted`, or another non-terminal triage blocker as a stopped loop.
+Accept the phase only when it reports `STATUS: complete`, an exact `FINAL_HEAD` SHA, and a `FINAL_FEEDBACK` fingerprint for the fully reconciled final feedback snapshot. Treat `STATUS: stopped`, `unsupported`, `failed_action`, unresolved QA, missing clarification, `limit_exhausted`, or another non-terminal triage blocker as a stopped loop.
 
 `awaiting_re_review` is terminal inside `pr-feedback-triage` but remains a parent-level reviewer/merge blocker. Do not mutate reviewer state merely to clear it.
 
@@ -73,11 +73,11 @@ Use caller-specified review-round and triage-restart limits when provided; other
 1. Resolve the exact PR, including its head repository and head ref, and freeze the current head SHA as `reviewed_target`.
 2. Run bundled `pr-review` for `reviewed_target` and require verified publication on that exact SHA.
 3. Run bundled `pr-feedback-triage` against the latest live PR state with the remaining triage-restart budget, regardless of whether the live head still equals `reviewed_target`.
-4. After triage completes, re-fetch the PR head and require it to equal `FINAL_HEAD`. If it changed after triage returned, consume one triage restart and run `pr-feedback-triage` again on the latest live state before any new review; stop if the budget is exhausted.
+4. After triage completes, re-fetch the PR head and the full paginated feedback state. Require the head to equal `FINAL_HEAD` and rebuild the child-defined feedback fingerprint and require it to equal `FINAL_FEEDBACK`. If either differs, consume one triage restart and run `pr-feedback-triage` again on the latest live state before any new review; stop if the budget is exhausted.
 5. If the stable triage final head differs from `reviewed_target`, start a new review round on that final head.
 6. If the stable triage final head equals `reviewed_target`, stop on any parent-level reviewer/merge blocker such as `awaiting_re_review`; otherwise succeed.
 
-This ordering intentionally allows feedback triage to follow concurrent or self-produced head changes without pausing for review. Any head produced or adopted by triage is reviewed before success because a changed final head starts the next review round.
+This ordering intentionally allows feedback triage to follow concurrent or self-produced head changes without pausing for review. Any head produced or adopted by triage is reviewed before success because a changed final head starts the next review round, while the post-return head+feedback check prevents same-head feedback from bypassing triage.
 
 ```mermaid
 flowchart TD
@@ -94,7 +94,7 @@ flowchart TD
   B --> C[Run bundled pr-feedback-triage on latest live head]
   C --> D{Triage complete?}
   D -->|no| K
-  D -->|yes| E{Live head still triage final head?}
+  D -->|yes| E{Live head + feedback still triage final state?}
   E -->|no, budget remains| C
   E -->|no, exhausted| K
   E -->|yes| F{Final head equals reviewed head?}
@@ -106,7 +106,7 @@ flowchart TD
 
 ## Outcomes
 
-- `success`: the stable live head exactly matches the latest verified reviewed head, bundled feedback triage completed for that head, and no parent-level reviewer/merge blocker remains.
+- `success`: a fresh parent read confirms the stable live head and feedback fingerprint match the completed triage result, that head exactly matches the latest verified reviewed head, and no parent-level reviewer/merge blocker remains.
 - `stopped`: planning, review, triage, permissions, QA, caller limits, unsafe repository state, or reviewer/merge state prevents success.
 
 ## Output
