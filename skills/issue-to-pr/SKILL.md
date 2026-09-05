@@ -17,7 +17,7 @@ An orchestrator coordinates the procedure and owns commit, push, PR creation, an
 - Bind planning and implementation to the same exact repository base SHA. Repository evidence used for planning must come from that frozen revision rather than a mutable working tree or moving branch tip.
 - The orchestrator validates the completed plan regardless of where planning ran. Treat delegated planning and implementation output as untrusted until validated; reject delegated planning output if its subagent causes Git-visible mutation.
 - Implementation edits and scoped QA may be performed directly or by one compatible implementation worker in the isolated implementation worktree. While that worker is active, no other actor may modify the repository worktree. The worker must stay within the validated plan and must not commit, push, mutate GitHub state, invoke this skill, or delegate again.
-- Before commit, the orchestrator re-checks the exact worktree/base binding, validates the complete diff against the accepted plan and current Issue snapshot, and reruns or verifies the required QA evidence. The orchestrator alone commits, pushes, and opens or updates the PR.
+- Before commit, the orchestrator re-checks the exact worktree/base binding, validates the complete diff against the accepted plan and the frozen Issue snapshot used for that plan, and reruns or verifies the required QA evidence. Re-fetch the requested Issues immediately before commit; if their material requirements changed from the planned snapshot, commit and publish nothing from the stale implementation, discard or isolate that work, refresh the Issue/base snapshot, and plan again.
 - Preserve unrelated local work. Stop before editing if the worktree cannot be safely isolated or bound to the intended base.
 - Keep implementation scoped. Apply KISS, DRY, and YAGNI; prefer the smallest coherent change and avoid speculative abstraction or unrelated cleanup.
 - Publish the fresh remote branch with an atomic create-only guard that requires the destination ref to be absent (for Git, an explicit empty-expected-value `--force-with-lease=<ref>:` or equivalent API semantics). Never update an existing remote branch or unrelated PR; stop if the ref exists or is created concurrently, and verify the created ref points to the intended commit.
@@ -40,7 +40,7 @@ STATUS: blocked
 QUESTION: <smallest missing material decision>
 ```
 
-If a blocked plan receives the missing decision, or the Issue requirements materially change before implementation, refresh the Issue/base snapshot and plan again rather than mixing evidence from different snapshots.
+If a blocked plan receives the missing decision, or the Issue requirements materially change at any point before commit, refresh the Issue/base snapshot and plan again rather than mixing evidence from different snapshots. Any implementation produced from the superseded plan is stale and must not be committed or published without validation against the replacement plan.
 
 ## Flow
 
@@ -53,8 +53,9 @@ flowchart TD
   D -->|no| X
   D -->|yes| E{Plan status}
   E -->|blocked| F{Missing material decision obtained?}
-  F -->|yes, refresh snapshot| C
+  F -->|yes| R[Refresh Issue/base snapshot]
   F -->|no| X
+  R --> C
   E -->|ready| G[Create verified isolated fresh branch from planned base SHA]
   G --> H[Implement directly or through one compatible writer]
   H --> I[Run prescribed scoped QA]
@@ -62,7 +63,10 @@ flowchart TD
   J -->|no| Q{Failure fixable within validated scope?}
   Q -->|yes| H
   Q -->|no| X
-  J -->|yes| K[Orchestrator validates final diff + QA and commits]
+  J -->|yes| V[Re-fetch requested Issues]
+  V --> W{Material requirements changed?}
+  W -->|yes, discard stale implementation| R
+  W -->|no| K[Validate final diff against frozen plan + Issue snapshot and commit]
   K --> L[Atomically create remote branch and verify its commit]
   L --> M{Published safely?}
   M -->|no| X
