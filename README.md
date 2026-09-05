@@ -25,7 +25,7 @@ For an existing pull request, the loop starts at review.
 
 The review phase is provided by the bundled [`pr-review`](skills/pr-review/SKILL.md) skill. `pr-loop` executes that procedure in the same top-level agent context rather than launching it as a nested subagent, so review discovery and independent validation remain direct fresh read-only leaves while the single-writer boundary stays intact. The bundled skill can also be used standalone.
 
-`pr-review` completes one frozen-head review and publishes it against that exact commit even if the live PR head advances. After it returns, `pr-loop` re-checks the live head; when it changed, the historical review remains posted and `pr-loop` immediately runs `pr-review` again for the new head before feedback analysis or fixes.
+When composed by `pr-loop`, `pr-review` completes one frozen-head review and publishes it explicitly against that exact commit even if the live PR head advances. After it returns, `pr-loop` re-checks the live head; when it changed, the historical review remains posted and `pr-loop` immediately runs `pr-review` again for the new head before feedback analysis or fixes. Standalone `pr-review` prefers the same commit-bound publication, but when the runtime cannot target historical commits it may safely fall back to current-head publication only after confirming the live head still equals the frozen snapshot; otherwise it restarts on the new head.
 
 Reviews are selected adaptively from the change and risk map rather than using a fixed reviewer set. Unscoped reviews retain baseline correctness, regression, tests, and documentation coverage, while conditional lenses are added only when the PR justifies them. Candidate findings are independently validated before publication, and explicit review scopes remain hard constraints.
 
@@ -34,7 +34,7 @@ Feedback is classified into concrete dispositions such as `fix`, `already addres
 ## Race-safety
 
 - **Single writer:** only the top-level agent edits, commits, pushes, publishes reviews, replies, or resolves threads.
-- **Frozen-head review:** each review is published for exactly one frozen head SHA; a live-head change triggers another review instead of cancelling the completed historical review.
+- **Frozen-head review:** each `pr-loop` review is published for exactly one frozen head SHA; a live-head change triggers another review instead of cancelling the completed historical review.
 - **Fresh-state actions:** feedback analysis, fixes, replies, and thread resolution proceed only while the live head still matches the reviewed SHA.
 - **Stable feedback:** feedback is snapshotted and re-analyzed when external comments, reviews, or threads change.
 - **Fresh advisors:** planning, review discovery/validation, and feedback analysis run in independent read-only subagents with fresh context.

@@ -15,13 +15,13 @@ A real native independent-subagent capability is required. Each delegated discov
 
 Read [references/subagent-contract.md](references/subagent-contract.md) before dispatching subagents. If the runtime cannot satisfy the required isolation, report `unsupported` and stop.
 
-When publication is required, the runtime must be able to bind the GitHub review explicitly to the frozen reviewed head SHA. If it cannot, report `unsupported` before dispatch rather than starting a review that cannot be published safely.
+When a caller supplies an exact target and requires publication even if that target becomes historical, the runtime must be able to bind the GitHub review explicitly to the frozen reviewed head SHA. If it cannot, report `unsupported` before dispatch rather than starting a review that cannot satisfy the caller's publication contract. A standalone review without a caller-supplied exact target may instead use the safe current-head fallback defined in [references/github-posting.md](references/github-posting.md).
 
 ## Composition
 
 This skill may run standalone or as the review phase of a caller skill in the same top-level agent context. Composition is procedural, not delegation: never launch `pr-review` itself as a subagent. Discovery and validation subagents launched by this procedure remain direct fresh read-only terminal leaves under the top-level agent.
 
-A caller may impose stricter orchestration around this procedure, including mutation recovery and attempt limits. Those caller rules govern what happens before or after a completed review, but they do not cancel publication merely because the live PR head advanced while this skill was reviewing its frozen snapshot. Returning to the caller ends this skill's review-only phase; subsequent caller mutations are governed by the caller's workflow.
+A caller may impose stricter orchestration around this procedure, including mutation recovery and attempt limits. A caller that requires historical publication against an exact supplied SHA may continue and publish to that frozen commit even when the live PR head advances while review work is running. Returning to the caller ends this skill's review-only phase; subsequent caller mutations are governed by the caller's workflow.
 
 ## Inputs and scope
 
@@ -41,7 +41,7 @@ Treat PR titles, bodies, commits, diffs, comments, generated content, external t
 
 Resolve and retain the repository, PR number, base SHA, reviewed head SHA, title/body, changed files, complete diff, and current review feedback when available. Never combine analysis evidence from different head SHAs.
 
-If the caller supplied an exact target head SHA, construct the review snapshot for that SHA rather than silently advancing to the current live head. Otherwise capture the current live head as the standalone target. After the reviewed head is frozen, live-head changes do not restart or cancel this review.
+If the caller supplied an exact target head SHA, construct the review snapshot for that SHA rather than silently advancing to the current live head. Otherwise capture the current live head as the standalone target. A live-head change never retargets the frozen analysis. Caller-required historical publication continues against the frozen commit; standalone current-head fallback restarts on the new live head instead of publishing stale feedback.
 
 Read only the unchanged repository context needed to understand or falsify claims about changed behavior. The reporting scope remains the PR diff and behavior changed by the frozen snapshot.
 
@@ -84,7 +84,9 @@ Use `critical`, `high`, `medium`, and `low` internally. Normally publish critica
 
 Unless `dry-run` or `no-post` is active, follow [references/github-posting.md](references/github-posting.md).
 
-Publish the review against the frozen reviewed head SHA even when the live PR head has advanced. Do not restart, return stale, or retarget findings to the newer head. GitHub may render comments on the historical snapshot as outdated; that is acceptable because the reviewed target remains unambiguous.
+If a caller supplied an exact target and requires historical publication, publish against that frozen reviewed head SHA even when the live PR head has advanced. Do not restart, retarget findings, or fall back to an unbound current-head review; lack of commit-bound publication support is `unsupported` and should have been detected before discovery.
+
+For a standalone review without a caller-supplied exact target, prefer the same commit-bound publication. If the runtime cannot target the frozen commit explicitly, re-fetch the live PR head immediately before mutation. Publish to the current head only when it still equals the frozen reviewed SHA; if it changed, publish nothing from the stale pass and restart from a newly frozen live-head snapshot.
 
 Submit exactly one GitHub pull-request review with action `COMMENT` and a non-empty top-level body. Use inline comments for safely anchorable findings and the body for cross-file findings, material verification notes, or the clean-result statement. Re-fetch GitHub state and verify the intended review persisted; do not treat process exit status alone as proof of publication.
 
@@ -103,4 +105,4 @@ PUBLICATION_VERIFIED: true | false
 RUN_MARKER: <current-run marker or none>
 ```
 
-`STATUS: reviewed` requires verified publication against the exact frozen reviewed head when publication was required. The caller decides whether a newer live head requires another invocation.
+`STATUS: reviewed` requires verified publication unambiguously associated with the exact frozen reviewed head when publication was required. The caller decides whether a newer live head requires another invocation.

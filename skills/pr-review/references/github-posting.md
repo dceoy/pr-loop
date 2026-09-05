@@ -4,7 +4,7 @@ The top-level parent is the only actor allowed to publish PR-review feedback.
 
 ## Posting contract
 
-Unless the user selected `dry-run` or `no-post`, the review is incomplete until GitHub has accepted and persisted exactly one `COMMENT` pull-request review explicitly bound to the frozen reviewed head.
+Unless the user selected `dry-run` or `no-post`, the review is incomplete until GitHub has accepted and persisted exactly one `COMMENT` pull-request review that is unambiguously associated with the frozen reviewed head.
 
 Every review has a non-empty top-level body, including a clean review, and contains fresh run markers:
 
@@ -19,11 +19,11 @@ Use a new marker for every invocation so an older review cannot satisfy verifica
 
 Never mix analysis from different head SHAs.
 
-Bind publication to the frozen reviewed commit. A live PR head change does not cancel, restart, or retarget the review; publish the completed findings to the reviewed head even when GitHub renders the resulting review or inline comments as outdated.
+When a caller supplied an exact target and requires publication even if that target becomes historical, bind publication explicitly to the frozen reviewed commit. A live PR head change does not cancel, restart, or retarget that review; publish the completed findings to the reviewed head even when GitHub renders the resulting review or inline comments as outdated. Do not fall back to an unbound current-head review in this mode. If the runtime cannot explicitly target the frozen commit, the review is `unsupported` and should have stopped before discovery.
 
-Do not fall back to an unbound review against the current live head. When publication is required and the runtime cannot explicitly target the frozen reviewed commit, the review is `unsupported` and should have stopped before discovery.
+For standalone use without a caller-supplied exact target, prefer explicit commit-bound publication but retain a safe current-head fallback. If the runtime cannot target the frozen commit explicitly, re-fetch the live PR head immediately before mutation. Publish to the current head only when it still equals the frozen reviewed SHA. If it changed, publish nothing from that stale pass and restart the review from a newly frozen live-head snapshot.
 
-Immediately before mutation, re-fetch current review feedback only for duplicate suppression. Do not use newer-head content to alter the frozen analysis, and drop a finding only when existing feedback clearly covers the same root cause on the reviewed snapshot.
+Immediately before mutation, re-fetch current review feedback only for duplicate suppression. Do not use newer-head content to alter the frozen analysis, and drop a finding only when existing feedback clearly covers the same root cause on the reviewed snapshot. In standalone fallback mode, perform the live-head equality check after duplicate suppression so it is the final gate before publication.
 
 ## Inline vs top-level
 
