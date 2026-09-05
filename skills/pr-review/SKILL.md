@@ -5,15 +5,17 @@ description: Review a GitHub pull request with adaptive independent subagents, i
 
 # PR Review
 
-Review one pull request against one frozen base/head snapshot with adaptive discovery, independent validation, parent arbitration, and one verified `COMMENT` review by default.
+Review one pull request against one frozen base/head snapshot with adaptive discovery, independent validation, orchestrator arbitration, and one verified `COMMENT` review by default.
 
 This skill is review-only. Do not modify repository files, commits, branches, or pull-request state other than publishing the requested review feedback. Never approve, request changes, merge, or close the pull request unless the user explicitly asks for that separate action.
 
 ## Runtime and composition
 
-Read [references/subagent-contract.md](references/subagent-contract.md) before dispatching discovery or validation work and enforce it as the authoritative subagent contract. If the runtime cannot satisfy its isolation, deadline, or finite dispatch-budget requirements, return `unsupported`; if accepted delegated work fails or expires, return `failed` without publishing partial results.
+The orchestrator owns snapshot construction, task dispatch, candidate arbitration, publication, and final verification. Read [references/subagent-contract.md](references/subagent-contract.md) before dispatching discovery or validation work and enforce it as the authoritative delegated-analysis contract.
 
-This skill may run standalone or as a review phase inside a caller skill. Composition is procedural, not delegation: execute `pr-review` in the same top-level agent context and never launch the skill itself as a subagent. A caller may provide an exact target head SHA, require commit-bound historical publication, and impose stricter orchestration or recovery rules.
+Honor applicable project/runtime routing for compatible native subagent names, models, and roles. A project-defined reviewer or built-in agent is valid when it satisfies the required fresh-context, read-only, terminal-leaf, snapshot, and bounded-execution properties; this skill does not require a particular provider, model, or agent identity. If the runtime cannot satisfy the contract, return `unsupported`; if accepted delegated work fails or expires, return `failed` without publishing partial results.
+
+This skill may run standalone or as a review phase inside a caller skill. Composition is procedural, not delegation: execute `pr-review` within the caller's shared orchestration context and never launch the skill itself as a subagent. A caller may provide an exact target head SHA, require commit-bound historical publication, and impose stricter orchestration or recovery rules.
 
 ## Snapshot and scope
 
@@ -21,7 +23,7 @@ Resolve the pull request from a URL, `OWNER/REPO#NUMBER`, CI context, or the cur
 
 Freeze one exact base/head pair before analysis. A caller-supplied head SHA becomes the frozen head; otherwise use the current live head. Bind the changed-file inventory, diff, and all repository evidence to the frozen commits. Prefer direct commit-bound reads; if a mutable PR endpoint must be used, verify the relevant live base/head values immediately before and after that read and discard the result if they changed. Never combine analysis evidence from different snapshots.
 
-Keep the frozen repository/PR identifiers, base SHA, reviewed head SHA, and changed-file inventory in the parent context. Retrieve only the commit-bound diff and surrounding context needed by each task rather than retaining an unnecessarily large mutable PR snapshot.
+Keep the frozen repository/PR identifiers, base SHA, reviewed head SHA, and changed-file inventory in the orchestration context. Retrieve only the commit-bound diff and surrounding context needed by each task rather than retaining an unnecessarily large mutable PR snapshot.
 
 Publish by default. If the user explicitly requests `dry-run` or `no-post`, return findings without GitHub mutation. A caller may override inherited default dry-run behavior but not an explicit user instruction.
 
@@ -36,21 +38,21 @@ flowchart TD
   C -->|no| U[Unsupported]
   C -->|yes| D[Build adaptive risk map]
   B -->|no| D
-  D --> E[Dispatch fresh discovery tasks within finite budget]
+  D --> E[Dispatch compatible fresh discovery tasks within finite budget]
   E --> F{Delegated work succeeded?}
   F -->|no| X[Failed]
   F -->|yes| G{Material uncovered boundary and budget remains?}
   G -->|yes| E
   G -->|no| H[Deduplicate candidates by root cause]
   H --> I{Candidates?}
-  I -->|yes| J[Dispatch fresh validation tasks]
+  I -->|yes| J[Dispatch compatible fresh validation tasks]
   J --> K{Delegated work succeeded?}
   K -->|no| X
-  K -->|yes| L[Parent arbitration]
+  K -->|yes| L[Orchestrator arbitration]
   I -->|no| L
   L --> M{dry-run or no-post?}
   M -->|yes| R[Return findings without publication]
-  M -->|no| N[Publish using GitHub posting contract]
+  M -->|no| N[Orchestrator publishes using GitHub posting contract]
   N --> O{Publication verified?}
   O -->|no| X
   O -->|yes| Z[Reviewed]
@@ -58,7 +60,7 @@ flowchart TD
 
 ## Review procedure
 
-Read [references/review-lenses.md](references/review-lenses.md) to select the smallest credible risk-driven discovery set. Read [references/finding-validation.md](references/finding-validation.md) before validation and parent arbitration. Do not validate when every successful discovery task returns `CANDIDATES: none`.
+Read [references/review-lenses.md](references/review-lenses.md) to select the smallest credible risk-driven discovery set. Read [references/finding-validation.md](references/finding-validation.md) before validation and orchestrator arbitration. Do not validate when every successful discovery task returns `CANDIDATES: none`.
 
 Publish only confirmed, non-duplicate, PR-scoped findings with credible material impact and proportional remediation. A `needs-human` item may survive only as a concise top-level verification note when one unresolved external fact itself creates material merge risk. Normally publish critical/high and concrete medium findings; suppress low findings unless project policy requires them.
 
