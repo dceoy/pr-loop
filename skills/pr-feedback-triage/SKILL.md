@@ -32,6 +32,8 @@ Historical feedback remains in scope and must be revalidated against the current
 
 Require one disposition per distinct item: `fix`, `already addressed`, `outdated`, `answer`, `clarify`, `defer`, or `won't fix`. A `fix` includes the smallest concrete edit and verification; `defer` / `won't fix` include `decision_terminal: true|false`. Every item also includes source IDs, concise reply guidance or `none`, and `resolve`, `leave_open`, or `not_resolvable` for each source. Resolve a parent thread only when every contributing item is resolve-eligible.
 
+At completion, compute `FINAL_FEEDBACK` as a deterministic fingerprint of the full final paginated feedback snapshot using the same equality as reconciliation. The fingerprint must change for every field change that reconciliation would treat as an external feedback delta. A caller may treat it as opaque, but must be able to rebuild it from a fresh read of the same PR feedback state.
+
 Use a caller-specified triage-restart limit when provided; otherwise restarts are unbounded. Count every transition back to the live snapshot after the initial snapshot as one restart. Stop with `limit_exhausted` before starting another analysis when the limit is reached.
 
 ## Flow
@@ -94,4 +96,4 @@ Completion is blocked by unpublished fixes, missing clarification, non-terminal 
 
 ## Output
 
-Return `STATUS: complete|stopped` and `FINAL_HEAD: <sha>|none`, then report disposition counts, fixes and verification, replies/resolutions, terminal-state counts, restart count/limit, and any remaining blocker or required reviewer/user action.
+Return `STATUS: complete|stopped`, `FINAL_HEAD: <sha>|none`, and `FINAL_FEEDBACK: <fingerprint>|none`, then report disposition counts, fixes and verification, replies/resolutions, terminal-state counts, restart count/limit, and any remaining blocker or required reviewer/user action.
