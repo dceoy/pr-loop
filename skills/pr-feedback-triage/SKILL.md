@@ -16,7 +16,7 @@ Drive all current PR feedback through analysis, focused fixes, replies, and thre
 - Require a finite caller- or runtime-enforced subagent deadline; otherwise report `unsupported` and stop. Do not retry ambiguously accepted work.
 - Treat subagent output as advisory and validate it before acting.
 - Keep changes scoped to feedback. Apply KISS, DRY, and YAGNI and preserve unrelated local work.
-- Never publish unrelated local state. Immediately before a fix batch and again immediately before its remote push, require the live head and feedback to equal the analyzed snapshot; if either gate fails, publish nothing from that stale batch and restart triage. Use a clean isolated worktree rooted exactly at the analyzed head; leave unrelated local changes or unpushed commits untouched. Push only the resulting feedback-fix commit(s) to the recorded PR head ref without force. On push failure, re-fetch the remote head: restart triage only if it moved; otherwise retry one safe transient push failure once and report persistent, authentication, or policy failures as `failed_action`.
+- Never publish unrelated local state. Immediately before a fix batch and again immediately before its remote push, require the live head and feedback to equal the analyzed snapshot; if either gate fails, publish nothing from that stale batch and restart triage. Use a clean isolated worktree rooted exactly at the analyzed head; leave unrelated local changes or unpushed commits untouched. Push only the resulting feedback-fix commit(s) to the recorded PR head ref using an exact expected-SHA compare-and-swap such as `--force-with-lease=<ref>:<analyzed_head>`; never use unconditional force. On push failure, re-fetch the remote head: restart triage if it differs from the expected SHA; otherwise retry one safe transient push failure once and report persistent, authentication, or policy failures as `failed_action`.
 - Do not require an intervening PR review when the head changes; review/merge gating belongs to the caller or orchestrator after triage.
 
 ## Feedback Contract
@@ -31,6 +31,8 @@ Snapshot the exact live head repository/ref/SHA and all current feedback. Pagina
 Historical feedback remains in scope and must be revalidated against the current head. Split independent findings into stable item-scoped records while retaining parent source IDs; merge only the same root cause.
 
 Require one disposition per distinct item: `fix`, `already addressed`, `outdated`, `answer`, `clarify`, `defer`, or `won't fix`. A `fix` includes the smallest concrete edit and verification; `defer` / `won't fix` include `decision_terminal: true|false`. Every item also includes source IDs, concise reply guidance or `none`, and `resolve`, `leave_open`, or `not_resolvable` for each source. Resolve a parent thread only when every contributing item is resolve-eligible.
+
+Use a caller-specified triage-restart limit when provided; otherwise restarts are unbounded. Count every transition back to the live snapshot after the initial snapshot as one restart. Stop with `limit_exhausted` before starting another analysis when the limit is reached.
 
 ## Flow
 
@@ -47,10 +49,10 @@ flowchart TD
   U -->|Yes| F[Rebind clean isolated worktree at analyzed head<br/>Batch fixes + QA + commit]
   F --> AA{Live state still analyzed snapshot?}
   AA -->|No| A
-  AA -->|Yes| Z[Non-force push]
+  AA -->|Yes| Z[Expected-SHA lease push]
   Z --> V{Push accepted?}
   V -->|Yes| W[expected_head = pushed SHA]
-  V -->|No| X{Remote head changed?}
+  V -->|No| X{Remote head differs from expected?}
   X -->|Yes| A
   X -->|No| Y{Safe transient and not retried?}
   Y -->|Yes| AA
@@ -88,8 +90,8 @@ An active `CHANGES_REQUESTED` review is `awaiting_re_review`. Explicit dismissal
 
 Track every platform source as `resolved`, `replied_left_open`, `not_resolvable`, `awaiting_re_review`, or `failed_action`. `replied_left_open` is terminal only when its disposition is terminal.
 
-Completion is blocked by unpublished fixes, missing clarification, non-terminal defer/won't-fix decisions, failed actions, unresolved QA, or unreconciled head/feedback changes.
+Completion is blocked by unpublished fixes, missing clarification, non-terminal defer/won't-fix decisions, failed actions, unresolved QA, unreconciled head/feedback changes, or an exhausted caller limit.
 
 ## Output
 
-Report the analyzed/final head SHA, disposition counts, fixes and verification, replies/resolutions, terminal-state counts, and any remaining blocker or required reviewer/user action.
+Return `STATUS: complete|stopped` and `FINAL_HEAD: <sha>|none`, then report disposition counts, fixes and verification, replies/resolutions, terminal-state counts, restart count/limit, and any remaining blocker or required reviewer/user action.
