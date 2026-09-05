@@ -15,6 +15,8 @@ A real native independent-subagent capability is required. Each delegated discov
 
 Read [references/subagent-contract.md](references/subagent-contract.md) before dispatching subagents. If the runtime cannot satisfy the required isolation, report `unsupported` and stop.
 
+Every accepted discovery or validation dispatch must have a finite caller- or runtime-enforced deadline. A still-running task is not failure; continue waiting for that accepted dispatch until it terminates or its deadline expires. If any accepted discovery or validation task ends in terminal failure or reaches its deadline, cancel or reap it and any concurrently running siblings whose outputs would leave the advisory set incomplete, discard partial outputs, publish nothing, and return `failed`. Do not replace or retry an accepted failed or expired task. The only replacement exception is a caller's narrowly verified read-only mutation recovery; when that recovery applies during a composed review, end the current phase after restoration and require the caller to start a fresh `pr-review` invocation, so the recovered redispatch consumes a new review attempt under the caller's accounting.
+
 When a caller supplies an exact target and requires publication even if that target becomes historical, the runtime must be able to bind the GitHub review explicitly to the frozen reviewed head SHA. If it cannot, report `unsupported` before dispatch rather than starting a review that cannot satisfy the caller's publication contract. A standalone review without a caller-supplied exact target may instead use the safe current-head fallback defined in [references/github-posting.md](references/github-posting.md).
 
 ## Composition
