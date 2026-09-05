@@ -32,9 +32,9 @@ Historical feedback remains in scope and must be revalidated against the current
 
 Require one disposition per distinct item: `fix`, `already addressed`, `outdated`, `answer`, `clarify`, `defer`, or `won't fix`. A `fix` includes the smallest concrete edit and verification; `defer` / `won't fix` include `decision_terminal: true|false`. Every item also includes source IDs, concise reply guidance or `none`, and `resolve`, `leave_open`, or `not_resolvable` for each source. Resolve a parent thread only when every contributing item is resolve-eligible.
 
-At completion, compute `FINAL_FEEDBACK` as a deterministic fingerprint of the full final paginated feedback snapshot using the same equality as reconciliation. The fingerprint must change for every field change that reconciliation would treat as an external feedback delta. A caller may treat it as opaque, but must be able to rebuild it from a fresh read of the same PR feedback state.
+At completion, compute `FINAL_FEEDBACK` as the lowercase hex SHA-256 of canonical UTF-8 JSON for the full final paginated feedback snapshot. Normalize each platform source into one record containing its typed source ID and every value reconciliation compares, represent unavailable values as JSON `null`, sort records by typed source ID, sort nested comment/reply records by their platform ID, and recursively serialize object keys in lexicographic order with no insignificant whitespace. Preserve array order only when that order is itself reconciliation-significant. The parent rebuilds the same canonical JSON from a fresh paginated read and hashes it identically.
 
-Use a caller-specified triage-restart limit when provided; otherwise restarts are unbounded. Count every transition back to the live snapshot after the initial snapshot as one restart. Stop with `limit_exhausted` before starting another analysis when the limit is reached.
+Use a caller-specified triage-restart limit when provided; otherwise restarts are unbounded. A limit of `N` permits `N` actual restarts after the initial snapshot. Before each transition back to the live snapshot, stop with `limit_exhausted` if the restart count already equals the limit; otherwise increment the count and perform the restart.
 
 ## Flow
 
