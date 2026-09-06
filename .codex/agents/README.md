@@ -13,12 +13,14 @@ Implementation remains owned by the top-level main agent. Named agents are fresh
 
 The TOML files intentionally omit `model` and `model_reasoning_effort`; both are selected per native dispatch.
 
-- `planner`: Terra → Sol for materially complex planning.
-- `advisor`: Sol.
-- `reviewer`: select from the task's concrete risk and hardest lens: Luna for lightweight docs/comments/narrow coverage, Terra for ordinary correctness/errors/types/compatibility/simplification/performance reasoning, and Sol for security or privilege boundaries, migrations, concurrency, difficult state transitions, cross-component invariants, resource exhaustion, broad scalability, or similarly high-risk analysis.
-- `feedback-analyst`: Luna → Terra for ambiguous or code-reasoning-heavy triage.
+- `planner`: Terra by default → Sol for architecture, public interfaces, schemas, migrations, security boundaries, broad cross-cutting behavior, or unusually regression-prone planning → Astra only for the hardest plans when several such concerns interact, uncertainty remains, or design-error cost is unusually high.
+- `advisor`: Sol by default → Astra for consequential architecture, security, cross-system, or similarly high-impact judgment.
+- `reviewer`: select from the task's concrete risk and hardest lens: Luna for lightweight docs/comments/narrow coverage, Terra for ordinary correctness/errors/types/compatibility/simplification/performance reasoning, Sol for high-risk security, migration, concurrency, state, invariant, exhaustion, or scalability analysis, and Astra only for the highest-risk or most cross-cutting reviews.
+- `feedback-analyst`: Luna → Terra for ambiguous or code-reasoning-heavy triage; escalate consequential architecture-level judgment to `advisor`.
 
-Effort is selected for the chosen model: Luna=`max`; Terra=`xhigh` or `max`; Sol=`high`, `xhigh`, or `max`. See `.codex/AGENTS.md` for the default effort within each model and escalation criteria.
+Astra is capability-gated: use it only when the native Codex model catalog or dispatch surface confirms `gpt-6-astra` support in the current environment. Otherwise remain on Sol with an appropriate Sol effort.
+
+Effort is selected for the chosen model: Luna=`max`; Terra=`xhigh` or `max`; Sol=`high`, `xhigh`, or `max`; Astra=`high`, `xhigh`, or `max`. See `.codex/AGENTS.md` for the default effort within each model and escalation criteria.
 
 Invoke named roles only through Codex native multi-agent tools. With MultiAgentV2 use `fork_turns: "none"`; with MultiAgentV1 use `fork_context: false` or omit it. Pass task-specific context explicitly and apply the mutation guard defined in `.codex/AGENTS.md`.
 
