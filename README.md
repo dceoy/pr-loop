@@ -18,11 +18,10 @@ flowchart LR
   I[Issue] --> P[issue-to-pr] --> PR[Pull request]
   PR --> R[pr-review<br/>frozen head]
   R --> F[pr-feedback-triage<br/>latest live state]
-  F --> H{Final head changed?}
-  H -->|yes| R
-  H -->|no| B{Reviewer or merge blocker?}
-  B -->|yes| X[Stopped]
-  B -->|no| S[Success]
+  F --> D{Post-triage state?}
+  D -->|head changed| R
+  D -->|stable + blocked| X[Stopped]
+  D -->|stable + unblocked| S[Success]
   P -->|cannot complete| X
 ```
 
