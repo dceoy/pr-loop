@@ -19,7 +19,11 @@ Honor applicable project/runtime routing when choosing a compatible native subag
 
 Every accepted discovery or validation dispatch requires a finite caller- or runtime-enforced deadline. The complete review invocation must also have a finite caller- or runtime-enforced bound on adaptive dispatch, such as a dispatch count or an overall invocation deadline that prevents indefinite expansion. If either bound is unavailable, return `unsupported` before dispatch.
 
-A still-running task is not failure; continue waiting for the same accepted dispatch until it terminates or reaches its deadline. If an accepted task fails or expires, cancel or reap affected work, discard partial outputs, publish nothing, and return `failed`. Do not retry or replace ambiguously accepted failed work. A caller may define a narrowly verified read-only mutation-recovery path, but returning for that recovery ends the current review phase; any retry is a fresh `pr-review` invocation.
+A still-running task is not failure; continue waiting for the same accepted dispatch until it terminates or reaches its deadline. If an accepted task terminates with a non-timeout failure, cancel or reap affected work, discard partial outputs, publish nothing, and return `failed`. Do not retry or replace ambiguously accepted failed work.
+
+An explicitly identified deadline expiry may be recovered once for that logical task when the orchestrator can verify all of the following before redispatch: the expired task has been cancelled or reaped to a terminal state; it cannot overlap the replacement; the pre-dispatch mutation guard still matches; the frozen review snapshot is unchanged; no review, comment, repository mutation, or other external side effect occurred; and the invocation-wide adaptive-dispatch bound still permits the replacement. Redispatch one fresh task with the same or a narrower decision-complete packet, record that the logical task's timeout-recovery budget is consumed, and continue normally if it succeeds. If any verification is unavailable or ambiguous, the replacement expires or fails, or the one-shot recovery was already consumed, publish nothing and return `failed`.
+
+A caller may separately define a narrowly verified read-only mutation-recovery path. Timeout recovery and mutation recovery are distinct: neither permits overlapping duplicate work, and neither permits retry after ambiguous acceptance or an ordinary terminal failure.
 
 ## Compact task packet
 
@@ -81,4 +85,4 @@ All review publication and GitHub mutation belongs to the orchestrator after arb
 
 ## Discovery dispatch policy
 
-Use the smallest number of independent discovery tasks that provides credible coverage. Typical reviews use 1-4 tasks; one is sufficient for a small low-risk change. Add another task only for a materially distinct scope or risk hypothesis, or when later evidence reveals a new high-risk boundary, and never exceed the invocation's finite adaptive-dispatch bound. Concurrency is preferred when available but not required.
+Use the smallest number of independent discovery tasks that provides credible coverage. Typical reviews use 1-4 tasks; one is sufficient for a small low-risk change. For a small change where configuration and documentation describe the same behavioral contract, prefer one bounded reviewer task unless a materially distinct independent hypothesis justifies another dispatch. Add another task only for a materially distinct scope or risk hypothesis, or when later evidence reveals a new high-risk boundary, and never exceed the invocation's finite adaptive-dispatch bound. Concurrency is preferred when available but not required.
