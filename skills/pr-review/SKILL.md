@@ -13,7 +13,7 @@ This skill is review-only. Do not modify repository files, commits, branches, or
 
 The orchestrator owns snapshot construction, task dispatch, candidate arbitration, publication, and final verification. Read [references/subagent-contract.md](references/subagent-contract.md) before dispatching discovery or validation work and enforce it as the authoritative delegated-analysis contract.
 
-Honor applicable project/runtime routing for compatible native subagent names, models, and roles. A project-defined reviewer or built-in agent is valid when it satisfies the required fresh-context, read-only, terminal-leaf, snapshot, and bounded-execution properties; this skill does not require a particular provider, model, or agent identity. If the runtime cannot satisfy the contract, return `unsupported`; if accepted delegated work fails or expires, return `failed` without publishing partial results.
+Honor applicable project/runtime routing for compatible native subagent names, models, and roles. A project-defined reviewer or built-in agent is valid when it satisfies the required fresh-context, read-only, terminal-leaf, snapshot, and bounded-execution properties; this skill does not require a particular provider, model, or agent identity. If the runtime cannot satisfy the contract, return `unsupported`. If accepted delegated work fails, or expires without satisfying the delegated-analysis contract's one-shot timeout-recovery path, return `failed` without publishing partial results.
 
 This skill may run standalone or as a review phase inside a caller skill. Composition is procedural, not delegation: execute `pr-review` within the caller's shared orchestration context and never launch the skill itself as a subagent. A caller may provide an exact target head SHA, require commit-bound historical publication, and impose stricter orchestration or recovery rules.
 
@@ -40,14 +40,20 @@ flowchart TD
   B -->|no| D
   D --> E[Dispatch compatible fresh discovery tasks within finite budget]
   E --> F{Delegated work succeeded?}
-  F -->|no| X[Failed]
+  F -->|explicit timeout| Q{Safe one-shot timeout recovery available?}
+  Q -->|yes| E
+  Q -->|no| X[Failed]
+  F -->|other failure| X
   F -->|yes| G{Material uncovered boundary and budget remains?}
   G -->|yes| E
   G -->|no| H[Deduplicate candidates by root cause]
   H --> I{Candidates?}
   I -->|yes| J[Dispatch compatible fresh validation tasks]
   J --> K{Delegated work succeeded?}
-  K -->|no| X
+  K -->|explicit timeout| V{Safe one-shot timeout recovery available?}
+  V -->|yes| J
+  V -->|no| X
+  K -->|other failure| X
   K -->|yes| L[Orchestrator arbitration]
   I -->|no| L
   L --> M{dry-run or no-post?}
