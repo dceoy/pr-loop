@@ -41,7 +41,8 @@ flowchart TD
   D --> E[Dispatch compatible fresh discovery tasks within finite budget]
   E --> F{Delegated work succeeded?}
   F -->|explicit timeout| Q{Safe one-shot timeout recovery available?}
-  Q -->|yes| E
+  Q -->|yes| QE[Redispatch only the expired logical discovery task]
+  QE --> F
   Q -->|no| X[Failed]
   F -->|other failure| X
   F -->|yes| G{Material uncovered boundary and budget remains?}
@@ -51,7 +52,8 @@ flowchart TD
   I -->|yes| J[Dispatch compatible fresh validation tasks]
   J --> K{Delegated work succeeded?}
   K -->|explicit timeout| V{Safe one-shot timeout recovery available?}
-  V -->|yes| J
+  V -->|yes| VE[Redispatch only the expired logical validation task]
+  VE --> K
   V -->|no| X
   K -->|other failure| X
   K -->|yes| L[Orchestrator arbitration]
