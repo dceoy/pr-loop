@@ -41,6 +41,12 @@ For an existing pull request, `pr-loop` starts at `pr-review`.
 - Git and authenticated GitHub access through `gh` or an equivalent integration.
 - A coding-agent runtime with native independent read-only subagents and finite dispatch bounds for phases that require advisory work.
 
+## Runtime integration
+
+`pr-loop` is runtime- and model-agnostic. It keeps only runtime discovery adapters that expose this repository's skills, such as `.agents/skills/` and `.claude/skills`; shared Codex/Claude agent policy and model-routing configuration are not duplicated here.
+
+Optional shared runtime configuration, including Codex custom subagents and Claude project defaults, is maintained separately in [`dceoy/ai-coding-agent-skills`](https://github.com/dceoy/ai-coding-agent-skills).
+
 ## Usage
 
 ```text
