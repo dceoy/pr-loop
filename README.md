@@ -39,7 +39,7 @@ For an existing pull request, `pr-loop` starts at `pr-review`.
 ## Requirements
 
 - Git and authenticated GitHub access through `gh` or an equivalent integration.
-- A coding-agent runtime with native independent read-only subagents and finite dispatch bounds for phases that require advisory work.
+- A coding-agent runtime with native independent read-only subagents and the ability to enforce finite dispatch deadlines. `pr-feedback-triage` supplies portable defaults of 900 seconds per feedback-analysis dispatch and 9 triage restarts when callers do not specify overrides.
 
 ## Runtime integration
 
@@ -52,7 +52,7 @@ Optional shared runtime configuration, including Codex custom subagents and Clau
 ```text
 Implement https://github.com/OWNER/REPO/issues/123 with issue-to-pr
 Implement https://github.com/OWNER/REPO/issues/123 with pr-loop
-Run pr-loop on https://github.com/OWNER/REPO/pull/456
+Run pr-loop on https://github.com/OWNER/REPO/pull/456  # feedback-analysis/retriage bounds are optional
 Review https://github.com/OWNER/REPO/pull/456 with pr-review
 Triage https://github.com/OWNER/REPO/pull/456 with pr-feedback-triage
 ```
