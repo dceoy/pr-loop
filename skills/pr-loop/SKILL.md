@@ -26,9 +26,9 @@ Compose the sibling [`issue-to-pr`](../issue-to-pr/SKILL.md), [`pr-review`](../p
 
 ## Limits
 
-The composite loop requires separate finite bounds for review rounds and triage restarts, supplied by the caller or enforced by the runtime. A bound may be an explicit count or an equivalent overall execution deadline/policy that prevents indefinite looping. If either loop is effectively unbounded, report `unsupported` before entering it. Do not infer one bound from the other.
+The composite loop keeps separate finite bounds for review rounds and triage restarts. Caller/runtime bounds override portable defaults where a default exists. Review rounds still require an explicit finite caller/runtime count or equivalent overall execution deadline/policy. For triage restarts, when no caller/runtime bound is supplied, use the sibling `pr-feedback-triage` portable default of 3 actual restarts after the initial snapshot. If the review loop is effectively unbounded, report `unsupported` before entering it. Do not infer one bound from the other.
 
-One review round is one frozen-head review followed by triage until the live state matches a triage-complete snapshot. Maintain restart accounting in the shared orchestration context across triage reinvocations within that round. Every transition from an analyzed or completed triage state back to a fresh triage snapshot consumes one restart when a numeric limit is used and remains subject to the equivalent runtime bound otherwise.
+One review round is one frozen-head review followed by triage until the live state matches a triage-complete snapshot. Maintain restart accounting in the shared orchestration context across triage reinvocations within that round. Every transition from an analyzed or completed triage state back to a fresh triage snapshot consumes one restart when a numeric limit is used and remains subject to the equivalent runtime bound otherwise. Each `pr-feedback-triage` invocation also uses its own effective feedback-analysis deadline; when none is supplied, that sibling defaults each accepted feedback-analysis dispatch to 300 seconds.
 
 ## Flow
 
