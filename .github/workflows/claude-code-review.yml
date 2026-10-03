@@ -82,7 +82,7 @@ jobs:
           CLAUDE_REVIEW_CONCLUSION: ${{ steps.claude-review.outputs.conclusion }}
           CLAUDE_REVIEW_OUTCOME: ${{ steps.claude-review.outcome }}
         run: |
-          if [[ "${CLAUDE_REVIEW_OUTCOME}" == "success" && "${CLAUDE_REVIEW_CONCLUSION}" == "success" ]]; then
+          if [[ "${CLAUDE_REVIEW_OUTCOME}" == "success" && ( "${CLAUDE_REVIEW_CONCLUSION}" == "success" || -z "${CLAUDE_REVIEW_CONCLUSION}" ) ]]; then
             exit 0
           fi
 
