@@ -47,6 +47,26 @@ For an existing pull request, `pr-loop` starts at `pr-review`.
 
 Optional shared runtime configuration, including Codex custom subagents and Claude project defaults, is maintained separately in [`dceoy/ai-coding-agent-skills`](https://github.com/dceoy/ai-coding-agent-skills).
 
+## Reusable workflow
+
+Claude Code PR reviews can use the bundled reusable workflow:
+
+```yaml
+jobs:
+  claude-code-review:
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+      actions: read
+    uses: dceoy/pr-loop/.github/workflows/claude-code-review.yml@main
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+It runs Claude Code's built-in `security-review` followed by this repository's `pr-review` skill.
+
 ## Usage
 
 ```text
