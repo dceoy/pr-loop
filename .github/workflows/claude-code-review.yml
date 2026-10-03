@@ -44,6 +44,7 @@ jobs:
   claude-code-review:
     if: >
       github.event_name == 'pull_request'
+      && (! github.event.pull_request.draft)
     runs-on: ${{ inputs.runs-on }}
     steps:
       - name: Checkout repository
