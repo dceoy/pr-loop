@@ -1,0 +1,107 @@
+---
+name: Pull request review using Claude Code
+on:
+  # pull_request:
+  #   types:
+  #     - opened
+  #     - ready_for_review
+  workflow_call:
+    inputs:
+      claude-args:
+        required: false
+        type: string
+        description: Additional arguments to pass directly to Claude Code Action
+        default: >-
+          --allowedTools="Skill,Agent,Task,Read,Glob,Grep,WebFetch,WebSearch,Bash(git:*),Bash(gh:*),mcp__github_inline_comment__create_inline_comment"
+          --model=opusplan
+          --advisor=opus
+          --effort=high
+      runs-on:
+        required: false
+        type: string
+        description: Runner to use
+        default: ubuntu-latest
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN:
+        required: false
+        description: OAuth token for Claude Code
+      GH_TOKEN:
+        required: false
+        description: Optional GitHub token for checkout
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+  actions: read
+concurrency:
+  group: claude-code-review-${{ github.repository }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+defaults:
+  run:
+    shell: bash -euo pipefail {0}
+    working-directory: .
+jobs:
+  claude-code-review:
+    if: >
+      github.event_name == 'pull_request'
+      && (! github.event.pull_request.draft)
+    runs-on: ${{ inputs.runs-on }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+          persist-credentials: false
+      - name: Initialize origin HEAD at pull request base
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git update-ref refs/remotes/origin/pr-review-base "${PR_BASE_SHA}"
+          git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/pr-review-base
+      - name: Run comprehensive PR review
+        id: claude-review
+        uses: anthropics/claude-code-action@756cc22e19660d20e8cc9496b4f242475a7f7790  # v1.0.235
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          additional_permissions: |
+            contents: read
+            pull_requests: write
+            issues: read
+            actions: read
+          prompt: |
+            Review ${{ github.repository }} pull request #${{ github.event.pull_request.number }} with both of these Claude Code skills, in this order:
+
+            1. Invoke Claude Code's built-in `security-review` skill through the `Skill` tool. Run its security analysis against the checked-out pull-request head and keep its findings as supplemental candidate findings. Do not modify repository files.
+            2. Invoke this repository's `pr-review` skill through the `Skill` tool. Treat `.claude/skills/pr-review/SKILL.md` (backed by `skills/pr-review/SKILL.md`) as the authoritative review procedure.
+
+            Carry any `security-review` findings into `pr-review` as additional candidates. Let `pr-review` perform its normal independent validation, deduplication, arbitration, publication, and verification so that exactly one consolidated PR review is published. Execute `pr-review` completely. Do not substitute the external `pr-review-toolkit` plugin or an ad hoc review flow.
+
+          claude_args: ${{ format('{0} --permission-mode=auto', inputs.claude-args) }}
+      - name: Diagnose Claude Code failure
+        if: always()
+        env:
+          CLAUDE_EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
+          CLAUDE_REVIEW_CONCLUSION: ${{ steps.claude-review.outputs.conclusion }}
+          CLAUDE_REVIEW_OUTCOME: ${{ steps.claude-review.outcome }}
+        run: |
+          if [[ "${CLAUDE_REVIEW_OUTCOME}" == "success" && ( "${CLAUDE_REVIEW_CONCLUSION}" == "success" || -z "${CLAUDE_REVIEW_CONCLUSION}" ) ]]; then
+            exit 0
+          fi
+
+          if [[ -n "${CLAUDE_EXECUTION_FILE}" && -f "${CLAUDE_EXECUTION_FILE}" ]]; then
+            jq -c '
+              [ .[] | select(.type == "result") ]
+              | last
+              | {
+                  subtype,
+                  is_error,
+                  api_error_status,
+                  terminal_reason,
+                  stop_reason,
+                  errors
+                }
+            ' "${CLAUDE_EXECUTION_FILE}"
+          fi
+          exit 1
