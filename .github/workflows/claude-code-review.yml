@@ -16,16 +16,6 @@ on:
           --model=opusplan
           --advisor=opus
           --effort=high
-      aws-role-to-assume:
-        required: false
-        type: string
-        description: IAM role ARN to assume via GitHub OIDC for Amazon Bedrock access
-        default: null
-      aws-region:
-        required: false
-        type: string
-        description: AWS region for Bedrock and OIDC credential configuration
-        default: us-east-1
       runs-on:
         required: false
         type: string
@@ -41,7 +31,6 @@ on:
 permissions:
   contents: read
   pull-requests: write
-  id-token: write
   actions: read
 defaults:
   run:
@@ -59,28 +48,11 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
           persist-credentials: false
-      - name: Configure AWS credentials
-        if: inputs.aws-role-to-assume != null
-        id: aws-credentials
-        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd  # v6.3.0
-        with:
-          role-to-assume: ${{ inputs.aws-role-to-assume }}
-          aws-region: ${{ inputs.aws-region }}
-          role-session-name: github-actions-${{ github.run_id }}
-          output-credentials: true
-          output-env-credentials: false
       - name: Run comprehensive PR review
         id: claude-review
         uses: anthropics/claude-code-action@756cc22e19660d20e8cc9496b4f242475a7f7790  # v1.0.235
-        env:
-          AWS_ACCESS_KEY_ID: ${{ steps.aws-credentials.outputs.aws-access-key-id }}
-          AWS_SECRET_ACCESS_KEY: ${{ steps.aws-credentials.outputs.aws-secret-access-key }}
-          AWS_SESSION_TOKEN: ${{ steps.aws-credentials.outputs.aws-session-token }}
-          AWS_REGION: ${{ inputs.aws-region }}
-          CLAUDE_CODE_DISABLE_ADVISOR_TOOL: ${{ inputs.aws-role-to-assume != null && '1' || '' }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          use_bedrock: ${{ inputs.aws-role-to-assume != null }}
           additional_permissions: |
             contents: read
             pull_requests: write
@@ -91,7 +63,7 @@ jobs:
 
             Treat `.claude/skills/pr-review/SKILL.md` (backed by `skills/pr-review/SKILL.md`) as the authoritative review procedure. Execute the skill completely, including its snapshot, delegated discovery and validation, publication, and verification requirements. Do not substitute the external `pr-review-toolkit` plugin or an ad hoc review flow.
 
-          claude_args: ${{ inputs.aws-role-to-assume == null && format('{0} --permission-mode=auto', inputs.claude-args) || inputs.claude-args }}
+          claude_args: ${{ format('{0} --permission-mode=auto', inputs.claude-args) }}
       - name: Diagnose Claude Code failure
         if: always()
         env:
