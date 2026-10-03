@@ -59,20 +59,6 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
           persist-credentials: false
-      - name: Prepare pinned Claude plugin marketplace
-        env:
-          CLAUDE_PLUGINS_REF: 340e33aef211d95769d252324854497af871dafe
-        run: |
-          marketplace="${RUNNER_TEMP}/pinned-pr-review-toolkit"
-          rm -rf "${marketplace}"
-          git init --quiet "${marketplace}"
-          git -C "${marketplace}" remote add origin https://github.com/anthropics/claude-plugins-official.git
-          git -C "${marketplace}" fetch --depth=1 origin "${CLAUDE_PLUGINS_REF}"
-          git -C "${marketplace}" checkout --quiet --detach "${CLAUDE_PLUGINS_REF}"
-          test "$(git -C "${marketplace}" rev-parse HEAD)" = "${CLAUDE_PLUGINS_REF}"
-          manifest="${marketplace}/.claude-plugin/marketplace.json"
-          jq '.name = "pinned-pr-review-toolkit"' "${manifest}" > "${manifest}.tmp"
-          mv "${manifest}.tmp" "${manifest}"
       - name: Configure AWS credentials
         if: inputs.aws-role-to-assume != null
         id: aws-credentials
@@ -101,20 +87,11 @@ jobs:
             issues: read
             actions: read
           prompt: |
-            Review ${{ github.repository }} pull request #${{ github.event.pull_request.number }} comprehensively. Use `gh pr diff ${{ github.event.pull_request.number }}` as the authoritative PR diff instead of working-tree `git diff`.
+            Review ${{ github.repository }} pull request #${{ github.event.pull_request.number }} by invoking the `pr-review` skill from this repository.
 
-            Run both review passes:
-            - `pr-review-toolkit:review-pr` with `code comments tests errors types parallel`.
-            - Claude Code's built-in `security-review`.
+            Treat `.claude/skills/pr-review/SKILL.md` (backed by `skills/pr-review/SKILL.md`) as the authoritative review procedure. Execute the skill completely, including its snapshot, delegated discovery and validation, publication, and verification requirements. Do not substitute the external `pr-review-toolkit` plugin or an ad hoc review flow.
 
-            Consolidate and deduplicate the results. Verify every finding against the current PR diff and relevant surrounding code. Report only actionable issues introduced by or materially affected by this PR; omit style-only, speculative, or already-fixed findings. Do not run code-simplifier or modify repository files.
-
-            Publishing the review is a required part of this task, not an optional follow-up. After completing all analysis, publish line-specific findings as inline PR review comments using `mcp__github_inline_comment__create_inline_comment`, then publish exactly one concise top-level COMMENT review with the overall result using `gh pr review ${{ github.event.pull_request.number }} --comment`. If there are no findings, still publish a concise no-findings COMMENT review. Never approve, request changes, or use issue comments.
-
-            Before returning your final response, verify the top-level review was actually created with `gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews` and confirm the newest review has state `COMMENTED` and the expected review body. If the review is missing, publish it and verify again. Do not return a final response until publication is verified; if publication or verification fails, report the command failure rather than claiming the review succeeded.
           claude_args: ${{ inputs.aws-role-to-assume == null && format('{0} --permission-mode=auto', inputs.claude-args) || inputs.claude-args }}
-          plugins: pr-review-toolkit@pinned-pr-review-toolkit
-          plugin_marketplaces: ${{ runner.temp }}/pinned-pr-review-toolkit
       - name: Diagnose Claude Code failure
         if: always()
         env:
