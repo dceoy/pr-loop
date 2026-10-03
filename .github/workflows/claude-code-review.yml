@@ -49,6 +49,12 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
           persist-credentials: false
+      - name: Initialize origin HEAD at pull request base
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git update-ref refs/remotes/origin/pr-review-base "${PR_BASE_SHA}"
+          git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/pr-review-base
       - name: Run comprehensive PR review
         id: claude-review
         uses: anthropics/claude-code-action@756cc22e19660d20e8cc9496b4f242475a7f7790  # v1.0.235
