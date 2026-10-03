@@ -45,6 +45,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
           persist-credentials: false
@@ -59,9 +60,12 @@ jobs:
             issues: read
             actions: read
           prompt: |
-            Review ${{ github.repository }} pull request #${{ github.event.pull_request.number }} by invoking the `pr-review` skill from this repository.
+            Review ${{ github.repository }} pull request #${{ github.event.pull_request.number }} with both of these Claude Code skills, in this order:
 
-            Treat `.claude/skills/pr-review/SKILL.md` (backed by `skills/pr-review/SKILL.md`) as the authoritative review procedure. Execute the skill completely, including its snapshot, delegated discovery and validation, publication, and verification requirements. Do not substitute the external `pr-review-toolkit` plugin or an ad hoc review flow.
+            1. Invoke Claude Code's built-in `security-review` skill through the `Skill` tool. Run its security analysis against the checked-out pull-request head and keep its findings as supplemental candidate findings. Do not modify repository files.
+            2. Invoke this repository's `pr-review` skill through the `Skill` tool. Treat `.claude/skills/pr-review/SKILL.md` (backed by `skills/pr-review/SKILL.md`) as the authoritative review procedure.
+
+            Carry any `security-review` findings into `pr-review` as additional candidates. Let `pr-review` perform its normal independent validation, deduplication, arbitration, publication, and verification so that exactly one consolidated PR review is published. Execute `pr-review` completely. Do not substitute the external `pr-review-toolkit` plugin or an ad hoc review flow.
 
           claude_args: ${{ format('{0} --permission-mode=auto', inputs.claude-args) }}
       - name: Diagnose Claude Code failure
