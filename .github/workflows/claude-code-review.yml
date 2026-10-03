@@ -33,6 +33,9 @@ permissions:
   pull-requests: write
   id-token: write
   actions: read
+concurrency:
+  group: claude-code-review-${{ github.repository }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 defaults:
   run:
     shell: bash -euo pipefail {0}
