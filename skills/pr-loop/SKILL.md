@@ -9,6 +9,8 @@ Drive same-repository Issues into a reviewed pull request, or drive an existing 
 
 Compose the sibling [`issue-to-pr`](../issue-to-pr/SKILL.md), [`pr-review`](../pr-review/SKILL.md), and [`pr-feedback-triage`](../pr-feedback-triage/SKILL.md) procedures in one shared orchestration context. Never launch a bundled skill itself as a subagent. Each sibling remains independently runnable, owns its standalone mechanics and safety contract, and may follow compatible project/runtime agent routing internally.
 
+Invoking `pr-loop` explicitly requests the complete composite procedure, including any native read-only subagent dispatches required by its sibling phases. Do not pause for separate user confirmation merely to launch those required subagents. This authorization does not weaken a sibling's capability contract: if the runtime genuinely cannot provide a required compliant native subagent, propagate `unsupported` as documented.
+
 ## Composition invariants
 
 - The composite orchestrator owns cross-phase state, phase transitions, and final success validation. Repository/GitHub mutation ownership inside each phase follows that sibling's contract; compatible implementation workers are allowed only where the sibling explicitly permits them and must preserve its single-writer boundary.
