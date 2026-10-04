@@ -7,7 +7,7 @@ description: Triage pull request feedback against the current head, apply focuse
 
 Drive all current PR feedback through analysis, focused fixes, replies, and thread resolution on the latest live head. Use the same procedure standalone or inside a larger PR loop.
 
-An orchestrator owns the live-state gates, disposition validation, commits, pushes, replies, resolutions, and final reconciliation. Feedback analysis remains delegated to one fresh independent read-only native subagent. Focused implementation may run in the orchestrator or in one project/runtime-selected implementation worker, but only one repository writer may be active at a time.
+An orchestrator owns the live-state gates, disposition validation, commits, pushes, replies, resolutions, and final reconciliation. Feedback analysis remains delegated to one fresh independent read-only native subagent. Invoking `pr-feedback-triage`, directly or through an explicitly invoked caller such as `pr-loop`, explicitly requests that required analysis dispatch; do not ask for separate user confirmation merely to launch it. Focused implementation may run in the orchestrator or in one project/runtime-selected implementation worker, but only one repository writer may be active at a time.
 
 ## Invariants
 
