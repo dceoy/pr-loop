@@ -11,7 +11,9 @@ This skill is review-only. Do not modify repository files, commits, branches, or
 
 ## Runtime and composition
 
-The orchestrator owns snapshot construction, task dispatch, candidate arbitration, publication, and final verification. Read [references/subagent-contract.md](references/subagent-contract.md) before dispatching discovery or validation work and enforce it as the authoritative delegated-analysis contract.
+The orchestrator owns snapshot construction, task dispatch, candidate arbitration, publication, and final verification. Invoking `pr-review`, directly or through an explicitly invoked caller such as `pr-loop`, explicitly requests the native read-only discovery and validation subagents required by this procedure. Do not ask for a second user confirmation merely to dispatch them.
+
+The files under `references/` are bundled support resources for this skill, not separately registered skills, agents, or tools. Resolve them relative to this `SKILL.md` and read them through ordinary skill/file access. Their absence from a host's skill or agent registry is not an unsupported condition. Read [references/subagent-contract.md](references/subagent-contract.md) before dispatching discovery or validation work and enforce it as the authoritative delegated-analysis contract. Return `unsupported` for reference access only when the bundled resource itself is genuinely inaccessible, not merely unregistered.
 
 Honor applicable project/runtime routing for compatible native subagent names, models, and roles. A project-defined reviewer or built-in agent is valid when it satisfies the required fresh-context, read-only, terminal-leaf, snapshot, and bounded-execution properties; this skill does not require a particular provider, model, or agent identity. If the runtime cannot satisfy the contract, return `unsupported`. If accepted delegated work fails, or expires without satisfying the delegated-analysis contract's one-shot timeout-recovery path, return `failed` without publishing partial results.
 
