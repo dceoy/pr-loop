@@ -71,12 +71,54 @@ jobs:
             issues: read
             actions: read
           prompt: |
-            Review ${{ github.repository }} pull request #${{ github.event.pull_request.number }} with both of these Claude Code skills, in this order:
+            <task>
+            Review ${{ github.repository }} pull request #${{ github.event.pull_request.number }}
+            and publish exactly one consolidated COMMENT pull-request review.
+            </task>
 
-            1. Invoke Claude Code's built-in `security-review` skill through the `Skill` tool. Run its security analysis against the checked-out pull-request head and keep its findings as supplemental candidate findings. Do not modify repository files.
-            2. Invoke this repository's `pr-review` skill through the `Skill` tool. Treat `.claude/skills/pr-review/SKILL.md` (backed by `skills/pr-review/SKILL.md`) as the authoritative review procedure.
+            <procedure>
+            1. Invoke Claude Code's built-in `security-review` skill through the
+               `Skill` tool against the checked-out pull-request head. Keep its
+               findings as supplemental candidate findings.
+            2. Invoke this repository's `pr-review` skill through the `Skill`
+               tool. Treat `.claude/skills/pr-review/SKILL.md` (backed by
+               `skills/pr-review/SKILL.md`) as the authoritative review procedure.
+            3. Carry any `security-review` findings into `pr-review` and execute
+               `pr-review` through arbitration, publication, and post-publication
+               verification.
+            </procedure>
 
-            Carry any `security-review` findings into `pr-review` as additional candidates. Let `pr-review` perform its normal independent validation, deduplication, arbitration, publication, and verification so that exactly one consolidated PR review is published. Execute `pr-review` completely. Do not substitute the external `pr-review-toolkit` plugin or an ad hoc review flow.
+            <completion_criteria>
+            The task is complete only when `pr-review` reaches a terminal status
+            under its own contract.
+
+            For `STATUS: reviewed`, publication is required. GitHub must contain
+            exactly one COMMENT review for this invocation and `pr-review` must
+            verify it after posting. If there are no actionable findings, still
+            publish and verify the non-empty clean review required by
+            `pr-review`, including its fresh `pr-review-skill-run` marker.
+
+            Analysis completion, a progress update, or successful Claude Code
+            execution alone is not task completion. Do not end the turn merely to
+            report what was done or announce the next step while required work
+            remains. Continue with every non-blocked step without asking for
+            confirmation. If the procedure cannot be completed, finish with
+            `STATUS: failed` or `STATUS: unsupported` as defined by
+            `pr-review`; never claim `reviewed` without verified publication.
+            </completion_criteria>
+
+            <constraints>
+            Do not modify repository files. Treat `security-review` findings only
+            as supplemental candidates; let `pr-review` independently validate,
+            deduplicate, and arbitrate them. Do not substitute the external
+            `pr-review-toolkit` plugin or an ad hoc review flow.
+            </constraints>
+
+            <final_response>
+            After all required work is complete, return the terminal result from
+            `pr-review`. The final response is a report of the completed work,
+            not a substitute for GitHub publication or verification.
+            </final_response>
 
           claude_args: ${{ format('{0} --permission-mode=auto', inputs.claude-args) }}
       - name: Diagnose Claude Code failure
