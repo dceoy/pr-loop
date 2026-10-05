@@ -129,9 +129,11 @@ jobs:
             `~/.claude/skills/pr-review`.
 
             Follow the skill through its terminal result. It owns discovery,
-            validation, deduplication, publication, verification, and optional
-            delegation to Claude Code's built-in `security-review` skill when
-            that built-in skill is available.
+            validation, deduplication, publication, verification, and
+            first-party security augmentation. In this Claude Code workflow,
+            invoke Claude Code's built-in `security-review` through the
+            `Skill` tool as the security discovery pass; do not silently skip
+            it.
             </procedure>
 
             <completion_criteria>
@@ -157,8 +159,10 @@ jobs:
             <constraints>
             Do not modify repository files. Do not substitute the external
             `pr-review-toolkit` plugin or an ad hoc review flow for
-            `pr-review`. Any optional security review is owned by
-            `pr-review`; do not launch a separate top-level security review.
+            `pr-review`. Security review is owned by `pr-review`; do not
+            launch a separate top-level security review. This workflow expects
+            Claude Code's first-party `security-review` capability. If it
+            cannot be invoked, do not claim `STATUS: reviewed`.
             </constraints>
 
             <final_response>
@@ -168,7 +172,7 @@ jobs:
             </final_response>
 
           claude_args: ${{ format('{0} --permission-mode=auto', inputs.claude-args) }}
-      - name: Verify PR review skill invocation
+      - name: Verify review skill invocations
         id: verify-invocation
         if: steps.claude-review.outcome == 'success'
         env:
@@ -193,6 +197,22 @@ jobs:
             )
           ' "${CLAUDE_EXECUTION_FILE}" >/dev/null; then
             echo "::error::expected top-level pr-review Skill invocation"
+            exit 1
+          fi
+
+          if ! jq -e '
+            any(
+              .[];
+              .type == "assistant"
+              and any(
+                .message.content[]?;
+                .type == "tool_use"
+                and .name == "Skill"
+                and ((.input.skill // .input.name // "") == "security-review")
+              )
+            )
+          ' "${CLAUDE_EXECUTION_FILE}" >/dev/null; then
+            echo "::error::expected Claude Code security-review Skill invocation"
             exit 1
           fi
       - name: Verify published PR review
