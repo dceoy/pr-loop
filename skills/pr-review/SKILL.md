@@ -21,7 +21,7 @@ This skill is review-only. Do not modify repository files, commits, branches, or
 
 ## Review
 
-Read [references/review-lenses.md](references/review-lenses.md) and [references/finding-validation.md](references/finding-validation.md). Missing registry entries are harmless if the files are otherwise readable; genuinely inaccessible required files make the review `unsupported`.
+Read [references/review-lenses.md](references/review-lenses.md) and [references/finding-validation.md](references/finding-validation.md). If a required bundled file is inaccessible, return `unsupported`.
 
 1. Select the smallest risk-driven analysis scope justified by the change.
 2. Discover concrete PR-scoped candidate defects.
