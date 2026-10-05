@@ -59,7 +59,7 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-It runs Claude Code's built-in `security-review` followed by this repository's `pr-review` skill.
+It runs `security-review` and `pr-review` discovery in parallel, then uses `pr-review` to revalidate, deduplicate, publish, and verify exactly one consolidated COMMENT review.
 
 ## Usage
 
