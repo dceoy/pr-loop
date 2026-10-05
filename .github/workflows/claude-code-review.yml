@@ -159,6 +159,7 @@ jobs:
 
           claude_args: ${{ format('{0} --permission-mode=auto', inputs.claude-args) }}
       - name: Verify published PR review
+        id: verify-review
         if: steps.claude-review.outcome == 'success'
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
@@ -195,12 +196,24 @@ jobs:
           CLAUDE_EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
           CLAUDE_REVIEW_CONCLUSION: ${{ steps.claude-review.outputs.conclusion }}
           CLAUDE_REVIEW_OUTCOME: ${{ steps.claude-review.outcome }}
+          VERIFY_REVIEW_OUTCOME: ${{ steps.verify-review.outcome }}
         run: |
-          if [[ "${CLAUDE_REVIEW_OUTCOME}" == "success" && ( "${CLAUDE_REVIEW_CONCLUSION}" == "success" || -z "${CLAUDE_REVIEW_CONCLUSION}" ) ]]; then
+          if [[ "${CLAUDE_REVIEW_OUTCOME}" == "success" && ( "${CLAUDE_REVIEW_CONCLUSION}" == "success" || -z "${CLAUDE_REVIEW_CONCLUSION}" ) && "${VERIFY_REVIEW_OUTCOME}" == "success" ]]; then
             exit 0
           fi
 
           if [[ -n "${CLAUDE_EXECUTION_FILE}" && -f "${CLAUDE_EXECUTION_FILE}" ]]; then
+            jq -c '
+              [
+                .[]
+                | select(.type == "assistant")
+                | .message.content[]?
+                | select(.type == "tool_use")
+                | .name
+              ]
+              | unique
+              | {tool_uses: .}
+            ' "${CLAUDE_EXECUTION_FILE}"
             jq -c '
               [ .[] | select(.type == "result") ]
               | last
@@ -210,6 +223,7 @@ jobs:
                   api_error_status,
                   terminal_reason,
                   stop_reason,
+                  result,
                   errors
                 }
             ' "${CLAUDE_EXECUTION_FILE}"
