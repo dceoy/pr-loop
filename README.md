@@ -59,7 +59,12 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-It runs `security-review` and `pr-review` discovery in parallel, then uses `pr-review` to revalidate, deduplicate, publish, and verify exactly one consolidated COMMENT review.
+The workflow invokes the bundled `pr-review` once and lets that skill own the
+full review lifecycle. When Claude Code exposes its built-in `security-review`
+Skill, `pr-review` uses it as a read-only supplemental discovery pass, then
+revalidates and deduplicates those candidates before publishing exactly one
+verified COMMENT review. If the built-in skill is unavailable, the normal
+`pr-review` analysis continues without it.
 
 ## Usage
 
