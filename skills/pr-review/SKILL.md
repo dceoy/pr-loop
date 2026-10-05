@@ -40,7 +40,14 @@ flowchart TD
   C -->|no| U[Unsupported]
   C -->|yes| D[Build adaptive risk map]
   B -->|no| D
-  D --> E[Dispatch compatible fresh discovery tasks within finite budget]
+  D --> P{Native subagent path?}
+  P -->|available and authorized| E[Dispatch compatible fresh discovery tasks within finite budget]
+  P -->|authorization-only refusal| IF[Inline bounded discovery pass]
+  P -->|capability, isolation, or finite bound unavailable| U
+  IF --> IC{Candidates?}
+  IC -->|yes| IV[Inline bounded validation pass]
+  IC -->|no| L[Orchestrator arbitration]
+  IV --> L
   E --> F{Delegated work succeeded?}
   F -->|explicit timeout| Q{Safe one-shot timeout recovery available?}
   Q -->|yes| QE[Redispatch only the expired logical discovery task]
@@ -58,7 +65,7 @@ flowchart TD
   VE --> K
   V -->|no| X
   K -->|other failure| X
-  K -->|yes| L[Orchestrator arbitration]
+  K -->|yes| L
   I -->|no| L
   L --> M{dry-run or no-post?}
   M -->|yes| R[Return findings without publication]
