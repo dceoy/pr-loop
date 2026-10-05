@@ -74,6 +74,8 @@ jobs:
             <task>
             Review ${{ github.repository }} pull request #${{ github.event.pull_request.number }}
             and publish exactly one consolidated COMMENT pull-request review.
+            Use the native read-only subagents required by `pr-review`; this task
+            explicitly authorizes those dispatches without further confirmation.
             </task>
 
             <procedure>
