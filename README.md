@@ -9,7 +9,7 @@
 - [`pr-feedback-triage`](skills/pr-feedback-triage/SKILL.md): reconcile feedback against the latest live head, apply focused fixes, and finish replies/resolutions.
 - [`pr-loop`](skills/pr-loop/SKILL.md): compose those phases until the stable final head is reviewed, triaged, and unblocked.
 
-Each standalone skill owns its own mechanics and result contract. The composite skill executes the same procedures in one shared orchestration context without duplicating their policies.
+Each standalone skill owns its own mechanics and result contract. The composite skill reuses those procedures without duplicating their policies.
 
 ## Flow
 
@@ -40,14 +40,6 @@ For an existing pull request, `pr-loop` starts at `pr-review`.
 
 - Git and authenticated GitHub access through `gh` or an equivalent integration.
 - A coding-agent runtime with GitHub/repository access and finite loop bounds. `pr-loop` defaults to 3 review rounds, while `pr-feedback-triage` defaults to 9 triage restarts when callers do not specify overrides.
-
-## Runtime integration
-
-`pr-loop` is runtime- and model-agnostic. It keeps only runtime discovery adapters that expose this repository's skills, such as `.agents/skills/` and `.claude/skills`; shared agent policy and model-routing configuration are not duplicated here. Skill/support-file registry entries are convenience discovery mechanisms, not execution prerequisites: ordinary relative file access is valid when those resources are present. Registry absence for a skill or support file must not by itself stop the loop.
-
-Execution topology is intentionally outside the skill contracts. The active runtime, agent, and model decide how to perform or distribute analysis and implementation work while satisfying the skills' snapshot, mutation, validation, and result invariants.
-
-Optional shared runtime configuration is maintained separately in [`dceoy/ai-coding-agent-skills`](https://github.com/dceoy/ai-coding-agent-skills).
 
 ## Reusable workflow
 
