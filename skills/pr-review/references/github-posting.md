@@ -1,6 +1,6 @@
 # GitHub Posting
 
-Each review invocation has one coordinated publication step. Analysis must not independently publish PR-review feedback.
+Publish review feedback once, after final arbitration.
 
 ## Posting contract
 
