@@ -64,10 +64,19 @@ jobs:
             skills/pr-review
           persist-credentials: false
       - name: Install reusable workflow PR review skill
+        id: install-review-skill
         run: |
+          skill_dir="${HOME}/.claude/skills/pr-review"
+          backup_dir="${RUNNER_TEMP}/pr-review-skill-backup"
           mkdir -p "${HOME}/.claude/skills"
-          rm -rf "${HOME}/.claude/skills/pr-review"
-          cp -R .pr-loop-workflow/skills/pr-review "${HOME}/.claude/skills/pr-review"
+          if [[ -e "${skill_dir}" || -L "${skill_dir}" ]]; then
+            rm -rf "${backup_dir}"
+            mv "${skill_dir}" "${backup_dir}"
+            printf 'restore=true\n' >> "${GITHUB_OUTPUT}"
+          else
+            printf 'restore=false\n' >> "${GITHUB_OUTPUT}"
+          fi
+          cp -R .pr-loop-workflow/skills/pr-review "${skill_dir}"
           printf '/.pr-loop-workflow/\n' >> .git/info/exclude
       - name: Initialize origin HEAD at pull request base
         env:
@@ -240,6 +249,17 @@ jobs:
           fi
           printf 'Verified pr-review COMMENT review %s for %s\n' \
             "${new_review_ids[0]}" "${PR_HEAD_SHA}"
+      - name: Restore runner PR review skill
+        if: always()
+        env:
+          RESTORE_REVIEW_SKILL: ${{ steps.install-review-skill.outputs.restore }}
+        run: |
+          skill_dir="${HOME}/.claude/skills/pr-review"
+          backup_dir="${RUNNER_TEMP}/pr-review-skill-backup"
+          rm -rf "${skill_dir}"
+          if [[ "${RESTORE_REVIEW_SKILL}" == "true" ]]; then
+            mv "${backup_dir}" "${skill_dir}"
+          fi
       - name: Diagnose Claude Code failure
         if: always()
         env:
