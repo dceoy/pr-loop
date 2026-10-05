@@ -43,7 +43,7 @@ For an existing pull request, `pr-loop` starts at `pr-review`.
 
 ## Runtime integration
 
-`pr-loop` is runtime- and model-agnostic. It keeps only runtime discovery adapters that expose this repository's skills, such as `.agents/skills/` and `.claude/skills`; shared Codex/Claude agent policy and model-routing configuration are not duplicated here. Skill/support-file registry entries are convenience discovery mechanisms, not execution prerequisites: ordinary relative file access is valid, and registry-only host limitations must not by themselves stop the loop.
+`pr-loop` is runtime- and model-agnostic. It keeps only runtime discovery adapters that expose this repository's skills, such as `.agents/skills/` and `.claude/skills`; shared Codex/Claude agent policy and model-routing configuration are not duplicated here. Skill/support-file registry entries are convenience discovery mechanisms, not execution prerequisites: ordinary relative file access is valid when those resources are present. Registry absence for a skill or support file must not by itself stop the loop, but native-subagent capability and isolation requirements remain governed by each skill contract.
 
 Optional shared runtime configuration, including Codex custom subagents and Claude project defaults, is maintained separately in [`dceoy/ai-coding-agent-skills`](https://github.com/dceoy/ai-coding-agent-skills).
 
