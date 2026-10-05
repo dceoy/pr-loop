@@ -1,6 +1,6 @@
 # GitHub Posting
 
-The top-level parent is the only actor allowed to publish PR-review feedback.
+Each review invocation has one coordinated publication step. Analysis must not independently publish PR-review feedback.
 
 ## Posting contract
 
@@ -47,7 +47,7 @@ Do not imply approval or resolution of unrelated existing feedback.
 
 After submission, re-fetch reviews and inline comments. Success requires evidence that the specific current-run COMMENT review persisted, is associated with the frozen reviewed head when GitHub exposes that metadata, contains the intended top-level body and fresh run marker, and includes every intended inline comment at the expected location.
 
-A returned review ID is useful but does not replace current-run marker verification. Do not treat process exit status, HTTP success alone, stdout, or the parent's final response as proof of publication.
+A returned review ID is useful but does not replace current-run marker verification. Do not treat process exit status, HTTP success alone, stdout, or the final response as proof of publication.
 
 If mutation succeeds but verification is inconclusive, re-read GitHub state once to rule out propagation delay. Do not create a second review merely because the first response was incomplete. If the intended artifact still cannot be verified, report publication failure.
 
