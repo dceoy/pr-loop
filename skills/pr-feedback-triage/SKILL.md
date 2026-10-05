@@ -48,8 +48,12 @@ The effective restart bound is caller/runtime supplied when present; otherwise i
 
 ```mermaid
 flowchart TD
-  A[Snapshot live head + relevant feedback] --> B[Fresh read-only feedback-analysis subagent]
-  B --> C{State still current?}
+  A[Snapshot live head + relevant feedback] --> B{Native subagent path?}
+  B -->|available and authorized| BA[Fresh read-only feedback-analysis subagent]
+  B -->|authorization-only refusal| BF[Inline feedback analysis]
+  B -->|capability, isolation, or finite bound unavailable| UO[Unsupported]
+  BA --> C{State still current?}
+  BF --> C
   C -->|changed, bound permits| A
   C -->|changed, exhausted| R[Stopped]
   C -->|stable| D[Validate dispositions]
