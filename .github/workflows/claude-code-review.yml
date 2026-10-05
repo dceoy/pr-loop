@@ -95,8 +95,8 @@ jobs:
             <task>
             Review ${{ github.repository }} pull request #${{ github.event.pull_request.number }}
             and publish exactly one consolidated COMMENT pull-request review.
-            Use the native read-only subagents required by `pr-review`; this task
-            explicitly authorizes those dispatches without further confirmation.
+            Follow `pr-review`'s review contract; execution strategy is left to
+            Claude Code and the selected model.
             </task>
 
             <procedure>
@@ -132,8 +132,8 @@ jobs:
 
             <constraints>
             Do not modify repository files. Treat `security-review` findings only
-            as supplemental candidates; let `pr-review` independently validate,
-            deduplicate, and arbitrate them. Do not substitute the external
+            as supplemental candidates; let `pr-review` validate, deduplicate,
+            and arbitrate them. Do not substitute the external
             `pr-review-toolkit` plugin or an ad hoc review flow.
             </constraints>
 
