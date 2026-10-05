@@ -23,6 +23,31 @@ Each sibling owns its standalone mechanics and safety contract.
 
 Do not clear reviewer state merely to satisfy the loop.
 
+## Flow
+
+```mermaid
+flowchart TD
+  S{Starting point} -->|Issue| I[Run issue-to-pr]
+  S -->|Existing PR| A[Freeze current head]
+  I --> J{Complete?}
+  J -->|no| X[Stopped or unsupported]
+  J -->|yes| A
+  A --> B[Run pr-review on frozen head]
+  B --> C{Reviewed exact head?}
+  C -->|no| X
+  C -->|yes| D[Run pr-feedback-triage on latest live state]
+  D --> E{Complete?}
+  E -->|no| X
+  E -->|yes| F{Live state matches triage snapshot?}
+  F -->|no, same head| D
+  F -->|no, head changed| A
+  F -->|yes| G{Final head equals reviewed head?}
+  G -->|no| A
+  G -->|yes| H{Reviewer or merge blocker?}
+  H -->|yes| X
+  H -->|no| Y[Success]
+```
+
 ## Bounds
 
 Keep review-round and triage-restart limits separate. Caller/runtime values override defaults.

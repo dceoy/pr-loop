@@ -32,6 +32,30 @@ Read [references/review-lenses.md](references/review-lenses.md) and [references/
 
 Discovery and validation are logically distinct even if one execution path performs both.
 
+## Flow
+
+```mermaid
+flowchart TD
+  A[Resolve PR and freeze exact base/head] --> B{Publication required?}
+  B -->|no| D[Select risk-driven analysis scope]
+  B -->|yes| C{Historical exact target?}
+  C -->|yes| P{Commit-bound publication supported?}
+  P -->|no| U[Unsupported]
+  P -->|yes| D
+  C -->|no| D
+  D --> E[Discover candidates]
+  E --> F{Candidates?}
+  F -->|yes| G[Deduplicate and validate]
+  F -->|no| H[Clean arbitration]
+  G --> H[Final arbitration]
+  H --> I{Publication required?}
+  I -->|no| R[Return findings without posting]
+  I -->|yes| J[Publish one COMMENT review]
+  J --> K{Publication verified?}
+  K -->|no| X[Failed]
+  K -->|yes| Z[Reviewed]
+```
+
 ## Publication
 
 Read and follow [references/github-posting.md](references/github-posting.md).
