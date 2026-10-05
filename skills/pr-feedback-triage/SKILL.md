@@ -56,8 +56,12 @@ flowchart TD
   E --> F{QA passes?}
   F -->|no, fixable in scope| E
   F -->|no| X
-  F -->|yes| G[Revalidate state and diff, then commit]
-  G --> H[Expected-SHA push and verify remote]
+  F -->|yes| G[Revalidate state and diff]
+  G --> R{Snapshot still current?}
+  R -->|no, bound permits| A
+  R -->|no, exhausted| X
+  R -->|yes| S[Commit]
+  S --> H[Expected-SHA push and verify remote]
   H --> I{Push verified?}
   I -->|remote changed| A
   I -->|persistent failure| X
