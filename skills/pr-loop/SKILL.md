@@ -17,7 +17,7 @@ Invoking `pr-loop` explicitly requests the complete composite procedure, includi
 
 - The composite orchestrator owns cross-phase state, phase transitions, and final success validation. Repository/GitHub mutation ownership inside each phase follows that sibling's contract; compatible implementation workers are allowed only where the sibling explicitly permits them and must preserve its single-writer boundary.
 - Project/runtime instructions may choose compatible agent names, models, and implementation routing. `pr-loop` must not override those choices merely to impose a fixed topology; it enforces the sibling capability contracts instead.
-- Advance only after the active sibling procedure reaches its documented successful terminal state, including an explicitly documented `inline-fallback` success mode. A recoverable host-policy refusal, missing registry entry, or earlier direct work is not itself terminal: refresh the relevant snapshot and resume the current phase. Propagate `unsupported` only when a mandatory operation or an explicitly required independent-subagent mode is genuinely unavailable; otherwise stop on non-success.
+- Advance only after the active sibling procedure reaches its documented successful terminal state, including an explicitly documented `inline-fallback` success mode. A recoverable authorization-only host-policy refusal, missing registry entry, or earlier direct work is not itself terminal: refresh the relevant snapshot and resume the current phase. Propagate `unsupported` when a sibling reports a genuine capability/resource failure, a mandatory operation is unavailable, or an effective finite bound cannot be enforced; otherwise stop on non-success.
 - Bind each `pr-review` invocation to one frozen PR head SHA; an older-head review remains valid historical feedback.
 - Run `pr-feedback-triage` against the latest live PR state after each accepted review, even when that state has advanced beyond the reviewed SHA.
 - Before success, freshly verify that the live head and complete relevant feedback equal the latest triage-complete snapshot retained in the shared orchestration context and that the live head equals the latest reviewed head.
@@ -66,7 +66,7 @@ The post-triage check re-fetches the live PR head and complete relevant paginate
 
 - `success`: the fresh live state equals the latest triage-complete snapshot, its head equals the latest verified reviewed head, and no composite reviewer/merge blocker remains.
 - `stopped`: a sibling phase, state validation, permission, exhausted finite bound, or reviewer/merge blocker prevents success.
-- `unsupported`: a mandatory repository/GitHub operation, finite bound, or explicitly required independent-subagent mode is unavailable. Host-level subagent-authorization or registry gating alone is not `unsupported`; use the documented inline fallback.
+- `unsupported`: a sibling's required capability or bundled resource is genuinely unavailable, a mandatory repository/GitHub operation is unavailable, or an effective finite bound cannot be enforced. Authorization-only subagent refusal or registry absence alone is not `unsupported`; use the documented inline/file-access recovery path.
 
 ## Output
 
