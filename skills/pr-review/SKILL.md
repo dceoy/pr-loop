@@ -13,9 +13,9 @@ This skill is review-only. Do not modify repository files, commits, branches, or
 
 The orchestrator owns snapshot construction, task dispatch, candidate arbitration, publication, and final verification. Invoking `pr-review`, directly or through an explicitly invoked caller such as `pr-loop`, explicitly requests the native read-only discovery and validation subagents required by this procedure. Do not ask for a second user confirmation merely to dispatch them.
 
-The files under `references/` are bundled support resources for this skill, not separately registered skills, agents, or tools. Resolve them relative to this `SKILL.md` and read them through ordinary skill/file access. Their absence from a host's skill or agent registry is not an unsupported condition. Read [references/subagent-contract.md](references/subagent-contract.md) before dispatching discovery or validation work and enforce it as the authoritative delegated-analysis contract. Return `unsupported` for reference access only when the bundled resource itself is genuinely inaccessible, not merely unregistered.
+The files under `references/` are bundled support resources for this skill, not separately registered skills, agents, or tools. Resolve them relative to this `SKILL.md` and read them through ordinary skill/file access. Their absence from a host's skill or agent registry is not an unsupported condition. Read [references/subagent-contract.md](references/subagent-contract.md) before dispatching discovery or validation work and enforce it as the authoritative delegated-analysis contract. If a required bundled resource is genuinely inaccessible through ordinary file access, return `unsupported`; do not confuse registry absence with file inaccessibility.
 
-Honor applicable project/runtime routing for compatible native subagent names, models, and roles. A project-defined reviewer or built-in agent is valid when it satisfies the required fresh-context, read-only, terminal-leaf, snapshot, and bounded-execution properties; this skill does not require a particular provider, model, or agent identity. If the runtime cannot satisfy the contract, return `unsupported`. If accepted delegated work fails, or expires without satisfying the delegated-analysis contract's one-shot timeout-recovery path, return `failed` without publishing partial results.
+Prefer compatible native subagents. A project-defined reviewer or built-in agent is valid when it satisfies the required fresh-context, read-only, terminal-leaf, snapshot, and bounded-execution properties; this skill does not require a particular provider, model, or agent identity. If a host policy refuses dispatch solely because the user did not literally request subagents, use `REVIEW_MODE: inline-fallback`: the orchestrator performs a bounded discovery pass and a separate validation pass against the same frozen snapshot, does not claim those passes are independent, and continues through publication and verification. Do not use this fallback when the user/runtime explicitly requires independent subagents. If the runtime genuinely lacks a compatible native-subagent facility or cannot satisfy the required isolation or finite dispatch bounds, return `unsupported`; that is a capability failure, not an authorization-only refusal. If a delegated task was accepted and then fails or times out, follow the delegated-analysis recovery contract and return `failed` if recovery does not succeed; never relabel an accepted delegated failure as inline fallback.
 
 This skill may run standalone or as a review phase inside a caller skill. Composition is procedural, not delegation: execute `pr-review` within the caller's shared orchestration context and never launch the skill itself as a subagent. A caller may provide an exact target head SHA, require commit-bound historical publication, and impose stricter orchestration or recovery rules.
 
@@ -40,7 +40,14 @@ flowchart TD
   C -->|no| U[Unsupported]
   C -->|yes| D[Build adaptive risk map]
   B -->|no| D
-  D --> E[Dispatch compatible fresh discovery tasks within finite budget]
+  D --> P{Native subagent path?}
+  P -->|available and authorized| E[Dispatch compatible fresh discovery tasks within finite budget]
+  P -->|authorization-only refusal| IF[Inline bounded discovery pass]
+  P -->|capability, isolation, or finite bound unavailable| U
+  IF --> IC{Candidates?}
+  IC -->|yes| IV[Inline bounded validation pass]
+  IC -->|no| L[Orchestrator arbitration]
+  IV --> L
   E --> F{Delegated work succeeded?}
   F -->|explicit timeout| Q{Safe one-shot timeout recovery available?}
   Q -->|yes| QE[Redispatch only the expired logical discovery task]
@@ -58,7 +65,7 @@ flowchart TD
   VE --> K
   V -->|no| X
   K -->|other failure| X
-  K -->|yes| L[Orchestrator arbitration]
+  K -->|yes| L
   I -->|no| L
   L --> M{dry-run or no-post?}
   M -->|yes| R[Return findings without publication]
@@ -70,13 +77,13 @@ flowchart TD
 
 ## Review procedure
 
-Read [references/review-lenses.md](references/review-lenses.md) to select the smallest credible risk-driven discovery set. Read [references/finding-validation.md](references/finding-validation.md) before validation and orchestrator arbitration. Do not validate when every successful discovery task yields no candidates under an accepted clean-empty convention defined by the delegated-analysis contract.
+Read [references/review-lenses.md](references/review-lenses.md) to select the smallest credible risk-driven discovery set. Read [references/finding-validation.md](references/finding-validation.md) before validation and orchestrator arbitration. If either required bundled resource is genuinely inaccessible through ordinary file access, return `unsupported`. In `inline-fallback`, perform discovery and validation as two explicit bounded passes in the orchestrator against the same frozen snapshot; validate each candidate from repository evidence before arbitration and do not describe the result as independently validated. Do not validate when every successful discovery pass yields no candidates under the applicable clean-empty convention.
 
 Publish only confirmed, non-duplicate, PR-scoped findings with credible material impact and proportional remediation. A `needs-human` item may survive only as a concise top-level verification note when one unresolved external fact itself creates material merge risk. Normally publish critical/high and concrete medium findings; suppress low findings unless project policy requires them.
 
 ## Publication
 
-Read and follow [references/github-posting.md](references/github-posting.md) as the authoritative publication and verification contract. Caller-required historical publication remains explicitly bound to the caller's frozen reviewed SHA; standalone review may use the documented safe current-head fallback when commit-bound publication is unavailable.
+Read and follow [references/github-posting.md](references/github-posting.md) as the authoritative publication and verification contract. If the required bundled resource is genuinely inaccessible through ordinary file access, return `unsupported` before publication. Caller-required historical publication remains explicitly bound to the caller's frozen reviewed SHA; standalone review may use the documented safe current-head fallback when commit-bound publication is unavailable.
 
 ## Result
 
@@ -88,7 +95,8 @@ When composed by a caller, return:
 STATUS: reviewed | unsupported | failed
 PR: <OWNER/REPO#NUMBER>
 REVIEWED_HEAD: <sha or none>
+REVIEW_MODE: subagents | inline-fallback
 PUBLISHED_FINDINGS: <count or none>
 ```
 
-`STATUS: reviewed` itself requires verified publication unambiguously associated with the exact frozen reviewed head when publication was required. The caller decides whether a newer live head requires another invocation.
+`STATUS: reviewed` itself requires verified publication unambiguously associated with the exact frozen reviewed head when publication was required. `REVIEW_MODE: inline-fallback` records reduced reviewer independence but is still a successful review when every frozen-snapshot, arbitration, publication, and verification gate above is satisfied. The caller decides whether a newer live head requires another invocation.

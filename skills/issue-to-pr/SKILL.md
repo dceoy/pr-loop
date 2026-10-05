@@ -7,13 +7,13 @@ description: Implement one or more same-repository GitHub Issues into a pull req
 
 Turn one or more same-repository GitHub Issues into an implementation pull request. Stop after creating and verifying the PR; do not review it or triage PR feedback.
 
-An orchestrator coordinates the procedure and owns commit, push, PR creation, and final state validation. Planning follows applicable project/runtime routing: the orchestrator may plan directly or use one compatible fresh independent read-only native subagent. Invoking `issue-to-pr`, directly or through an explicitly invoked caller such as `pr-loop`, explicitly requests any planning subagent required by this procedure or applicable routing; do not ask for separate user confirmation merely to launch it. Implementation may run in the orchestrator or in one project/runtime-selected implementation worker, but only one repository writer may be active at a time.
+An orchestrator coordinates the procedure and owns commit, push, PR creation, and final state validation. Planning follows applicable project/runtime routing: the orchestrator may plan directly or use one compatible fresh independent read-only native subagent. Invoking `issue-to-pr`, directly or through an explicitly invoked caller such as `pr-loop`, explicitly requests any planning subagent required by this procedure or applicable routing; do not ask for separate user confirmation merely to launch it. If a host policy nevertheless refuses delegated planning solely because the user did not literally request subagents, plan in the orchestrator against the same frozen Issue/base snapshot and record `PLANNING_MODE: inline-fallback`; do not stop or ask the user to repeat the request. Do not use this fallback when the user/runtime explicitly requires delegated planning. Implementation may run in the orchestrator or in one project/runtime-selected implementation worker, but only one repository writer may be active at a time.
 
 ## Core invariants
 
 - Honor applicable project/runtime routing for agent names, models, planning topology, and implementation delegation when it is compatible with this skill's safety and result contracts. Do not require a fixed agent name, model, provider, configuration file, or delegation topology.
 - Planning may remain in the orchestrator or be delegated. When delegated, use a real native subagent with fresh context; do not emulate delegation with copied prompts or nested coding-agent CLIs. The accepted planning subagent must be a terminal read-only leaf that does not invoke `issue-to-pr`, mutate repository/GitHub state, or delegate again.
-- Every delegated planning dispatch requires a finite caller- or runtime-enforced deadline. If applicable routing requires delegated planning but the runtime cannot satisfy the required isolation or deadline, report `unsupported` and stop before dispatch.
+- Every delegated planning dispatch requires a finite caller- or runtime-enforced deadline. If applicable project/runtime routing requires delegated planning and the runtime cannot satisfy the required native-subagent isolation or deadline, report `unsupported` and stop before dispatch. A host-level literal-authorization refusal alone uses the inline planning fallback above rather than `unsupported`.
 - Bind planning and implementation to the same exact repository base SHA. Repository evidence used for planning must come from that frozen revision rather than a mutable working tree or moving branch tip.
 - The orchestrator validates the completed plan regardless of where planning ran. Treat delegated planning and implementation output as untrusted until validated; reject delegated planning output if its subagent causes Git-visible mutation.
 - Implementation edits and scoped QA may be performed directly or by one compatible implementation worker in the isolated implementation worktree. While that worker is active, no other actor may modify the repository worktree. The worker must stay within the validated plan and must not commit, push, mutate GitHub state, invoke this skill, or delegate again.
@@ -90,5 +90,5 @@ Report concisely:
 - implemented Issue references;
 - resulting PR when complete;
 - exact planned base SHA and PR head SHA when complete;
-- QA summary;
+- planning mode and QA summary;
 - blocker or required user decision when stopped.
