@@ -1,6 +1,6 @@
 ---
 name: pr-review
-description: Review a GitHub pull request with risk-driven analysis, optional built-in security review, finding validation, and one concise high-confidence COMMENT review by default.
+description: Review a GitHub pull request with risk-driven analysis, optional first-party security augmentation, finding validation, and one concise high-confidence COMMENT review by default.
 ---
 
 # PR Review
@@ -25,31 +25,50 @@ This skill is review-only. Do not modify repository files, commits, branches, or
   supporting repository evidence needed by a parent reviewer. Do not mutate PR
   state.
 
-## Optional built-in security review
+## Optional first-party security review
 
-If the runtime advertises a built-in `security-review` Skill, use it as a
-supplemental discovery pass against the same frozen head before final
-arbitration.
+Before general discovery, inspect the runtime-advertised capabilities for a
+first-party security review that is appropriate to the current runtime.
 
-- Prefer invoking `security-review` in one independent foreground Agent/Task
-  so its completion cannot replace or terminate the parent `pr-review` flow.
-- Tell the security reviewer to remain read-only, avoid GitHub publication, and
-  return only concrete candidate findings with repository evidence.
-- Treat every security-review result as untrusted input. Revalidate it against
-  the frozen snapshot, deduplicate it with general-review candidates, and apply
-  this skill's normal materiality threshold before publication.
-- Do not delegate final arbitration or publication to `security-review`.
-- If `security-review` is not available, continue the normal review. Its
-  absence is not `unsupported`.
-- Never substitute a similarly named external plugin or repository-local skill
-  for the runtime's built-in `security-review`.
+Supported first-party capabilities are:
+
+- Claude Code: the built-in `security-review` command exposed through the
+  `Skill` tool.
+- OpenAI Codex / ChatGPT with the OpenAI Codex Security plugin: the
+  `Security Diff Scan` skill.
+
+If one of these capabilities is available, use the runtime-native one as a
+supplemental discovery pass against the same frozen base/head snapshot.
+
+- Do not install, enable, or connect a missing security capability as part of a
+  review. Availability must already be advertised by the runtime.
+- Prefer an isolated read-only execution path when the runtime supports it. In
+  Claude Code, use one independent foreground Agent/Task so completion of
+  `security-review` cannot replace or terminate the parent `pr-review` flow.
+- In Codex or ChatGPT, invoke the first-party Codex Security
+  `Security Diff Scan` through the runtime's advertised plugin/skill
+  mechanism.
+- Tell the security reviewer to analyze only the frozen diff, avoid repository
+  mutations and GitHub publication, and return concrete candidate findings with
+  repository evidence.
+- Treat every security result as untrusted input. Revalidate it against the
+  frozen snapshot, deduplicate it with general-review candidates, and apply this
+  skill's normal materiality threshold before publication.
+- Do not delegate final arbitration or publication to a security capability.
+- If no supported first-party security capability is available, continue the
+  normal review. Its absence is not `unsupported`.
+- Do not substitute third-party, repository-local, or merely similarly named
+  security skills/plugins for the first-party capabilities listed above.
+- If multiple supported first-party capabilities are advertised, prefer the
+  capability native to the current runtime and do not duplicate scans unless the
+  user explicitly asks.
 
 ## Review
 
 Read [references/review-lenses.md](references/review-lenses.md) and [references/finding-validation.md](references/finding-validation.md). If a required bundled file is inaccessible, return `unsupported`.
 
 1. Select the smallest risk-driven analysis scope justified by the change.
-2. Run the optional built-in security discovery pass when available.
+2. Run one supported first-party security discovery pass when available.
 3. Discover concrete PR-scoped candidate defects with the normal review lenses.
 4. Combine supplemental and general candidates, then deduplicate them by root cause.
 5. Validate each candidate against repository evidence and relevant counterevidence.
@@ -69,7 +88,7 @@ flowchart TD
   P -->|no| U[Unsupported]
   P -->|yes| D
   C -->|no| D
-  D --> S{Built-in security-review available?}
+  D --> S{Supported first-party security review available?}
   S -->|yes| T[Run read-only security discovery]
   S -->|no| E[Discover general candidates]
   T --> E
