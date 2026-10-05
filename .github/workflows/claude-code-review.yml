@@ -79,7 +79,7 @@ jobs:
                  select((.body // "") | contains("<!-- pr-review-skill -->")) |
                  select((.body // "") | contains($marker)) |
                  .id' \
-            | sort -n -u > "${baseline}"
+            | sort -u > "${baseline}"
           printf 'path=%s\n' "${baseline}" >> "${GITHUB_OUTPUT}"
       - name: Run comprehensive PR review
         id: claude-review
@@ -164,7 +164,7 @@ jobs:
                  select((.body // "") | contains("<!-- pr-review-skill -->")) |
                  select((.body // "") | contains($marker)) |
                  .id' \
-            | sort -n -u > "${current}"
+            | sort -u > "${current}"
 
           mapfile -t new_review_ids < <(
             comm -13 "${REVIEW_BASELINE_PATH}" "${current}"
