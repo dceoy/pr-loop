@@ -36,11 +36,7 @@ Discovery and validation are logically distinct even if one execution path perfo
 
 ```mermaid
 flowchart TD
-  A[Resolve PR and freeze exact base/head] --> B{Historical exact target?}
-  B -->|yes| C{Commit-bound publication supported?}
-  C -->|no| U[Unsupported]
-  C -->|yes| D[Select risk-driven analysis scope]
-  B -->|no| D
+  A[Resolve PR and freeze exact base/head] --> D[Select risk-driven analysis scope]
   D --> E[Discover candidates]
   E --> F{Candidates?}
   F -->|yes| G[Deduplicate and validate]
@@ -48,7 +44,11 @@ flowchart TD
   G --> H[Final arbitration]
   H --> I{dry-run or no-post?}
   I -->|yes| R[Return findings without posting]
-  I -->|no| J[Publish one COMMENT review]
+  I -->|no| B{Historical exact target?}
+  B -->|yes| C{Commit-bound publication supported?}
+  C -->|no| U[Unsupported]
+  C -->|yes| J[Publish one COMMENT review]
+  B -->|no| J
   J --> K{Publication verified?}
   K -->|no| X[Failed]
   K -->|yes| Z[Reviewed]
