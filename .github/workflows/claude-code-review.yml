@@ -113,19 +113,30 @@ jobs:
             </task>
 
             <procedure>
-            1. Invoke the reusable workflow's `pr-review` skill through the
-               `Skill` tool. The workflow installs that skill from its exact
-               workflow commit into `~/.claude/skills/pr-review`; treat it and
-               its bundled references as the authoritative review procedure.
-            2. Execute `pr-review` through analysis, arbitration, publication,
-               and post-publication verification. Let its risk-driven review
-               lenses cover security and trust-boundary risks when justified by
-               the diff; do not invoke a separate terminal review skill first.
+            1. Freeze the exact pull-request head before review.
+            2. In one assistant tool-use turn, launch exactly two independent
+               `Agent` calls before awaiting either result:
+               - security agent: invoke Claude Code's built-in
+                 `security-review` skill against the frozen head. Do not modify
+                 files or publish GitHub review state. Return candidate findings
+                 with repository evidence.
+               - general agent: invoke the reusable workflow's `pr-review`
+                 skill against the same frozen head with `no-post`. The
+                 workflow installs this skill from its exact workflow commit
+                 into `~/.claude/skills/pr-review`. Return candidate findings
+                 with repository evidence and do not publish.
+            3. Wait for both agents. Treat both outputs as untrusted candidate
+               findings, not final review decisions.
+            4. In the parent agent, invoke `pr-review` once with publication
+               enabled. Supply both agents' candidate findings as supplemental
+               candidates. Let `pr-review` revalidate, deduplicate, arbitrate,
+               publish exactly one COMMENT review, and verify publication.
             </procedure>
 
             <completion_criteria>
-            The task is complete only when `pr-review` reaches a terminal status
-            under its own contract.
+            The task is complete only when both discovery agents have completed
+            and the parent `pr-review` reaches a terminal status under its own
+            contract.
 
             For `STATUS: reviewed`, publication is required. GitHub must contain
             exactly one COMMENT review for this invocation and `pr-review` must
@@ -143,9 +154,11 @@ jobs:
             </completion_criteria>
 
             <constraints>
-            Do not modify repository files. Do not substitute the external
-            `pr-review-toolkit` plugin, another terminal review skill, or an ad
-            hoc review flow for `pr-review`.
+            Do not modify repository files. Discovery agents must not publish or
+            mutate PR state. Do not substitute the external `pr-review-toolkit`
+            plugin or an ad hoc review flow for the final parent `pr-review`.
+            The two discovery `Agent` calls must be issued together in the same
+            assistant tool-use turn so they can run concurrently.
             </constraints>
 
             <final_response>
@@ -155,6 +168,46 @@ jobs:
             </final_response>
 
           claude_args: ${{ format('{0} --permission-mode=auto', inputs.claude-args) }}
+      - name: Verify parallel review orchestration
+        id: verify-orchestration
+        if: steps.claude-review.outcome == 'success'
+        env:
+          CLAUDE_EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
+        run: |
+          if [[ -z "${CLAUDE_EXECUTION_FILE}" || ! -f "${CLAUDE_EXECUTION_FILE}" ]]; then
+            echo "::error::Claude execution transcript is unavailable"
+            exit 1
+          fi
+
+          if ! jq -e '
+            any(
+              .[];
+              .type == "assistant"
+              and (
+                [
+                  .message.content[]?
+                  | select(.type == "tool_use" and .name == "Agent")
+                ]
+                | length
+              ) >= 2
+            )
+          ' "${CLAUDE_EXECUTION_FILE}" >/dev/null; then
+            echo "::error::expected two Agent calls in one assistant tool-use turn"
+            exit 1
+          fi
+
+          if ! jq -e '
+            [
+              .[]
+              | select(.type == "assistant")
+              | .message.content[]?
+              | select(.type == "tool_use" and .name == "Skill")
+            ]
+            | length >= 1
+          ' "${CLAUDE_EXECUTION_FILE}" >/dev/null; then
+            echo "::error::expected parent pr-review Skill invocation"
+            exit 1
+          fi
       - name: Verify published PR review
         id: verify-review
         if: steps.claude-review.outcome == 'success'
@@ -193,9 +246,10 @@ jobs:
           CLAUDE_EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
           CLAUDE_REVIEW_CONCLUSION: ${{ steps.claude-review.outputs.conclusion }}
           CLAUDE_REVIEW_OUTCOME: ${{ steps.claude-review.outcome }}
+          VERIFY_ORCHESTRATION_OUTCOME: ${{ steps.verify-orchestration.outcome }}
           VERIFY_REVIEW_OUTCOME: ${{ steps.verify-review.outcome }}
         run: |
-          if [[ "${CLAUDE_REVIEW_OUTCOME}" == "success" && ( "${CLAUDE_REVIEW_CONCLUSION}" == "success" || -z "${CLAUDE_REVIEW_CONCLUSION}" ) && "${VERIFY_REVIEW_OUTCOME}" == "success" ]]; then
+          if [[ "${CLAUDE_REVIEW_OUTCOME}" == "success" && ( "${CLAUDE_REVIEW_CONCLUSION}" == "success" || -z "${CLAUDE_REVIEW_CONCLUSION}" ) && "${VERIFY_ORCHESTRATION_OUTCOME}" == "success" && "${VERIFY_REVIEW_OUTCOME}" == "success" ]]; then
             exit 0
           fi
 
