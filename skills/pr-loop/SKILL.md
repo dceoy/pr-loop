@@ -1,79 +1,41 @@
 ---
 name: pr-loop
-description: Implement same-repository GitHub Issues into a reviewed pull request, or review and fix an existing PR, iterating through review and live-head feedback triage until the final head is reviewed and no blocker remains.
+description: Implement same-repository GitHub Issues into a reviewed pull request, or review and fix an existing PR until the final head is reviewed and unblocked.
 ---
 
 # PR Loop
 
-Drive same-repository Issues into a reviewed pull request, or drive an existing pull request through review and feedback-fix rounds until the final head is reviewed and no actionable or reviewer-blocked state remains.
+Compose [`issue-to-pr`](../issue-to-pr/SKILL.md), [`pr-review`](../pr-review/SKILL.md), and [`pr-feedback-triage`](../pr-feedback-triage/SKILL.md) until the stable final PR head is reviewed, triaged, and unblocked.
 
-Compose the sibling [`issue-to-pr`](../issue-to-pr/SKILL.md), [`pr-review`](../pr-review/SKILL.md), and [`pr-feedback-triage`](../pr-feedback-triage/SKILL.md) procedures in one shared orchestration context. Never launch a bundled skill itself as a subagent. Each sibling remains independently runnable, owns its standalone mechanics and safety contract, and may follow compatible project/runtime agent routing internally.
+Each sibling owns its standalone mechanics and safety contract.
 
-Sibling procedures and their support files are semantic dependencies, not registry dependencies. Prefer the runtime's registered skill interface when available, otherwise resolve the sibling `SKILL.md` and support files through ordinary repository/file access. Never stop merely because a sibling or a `references/` file is absent from a host registry.
+## Procedure
 
-Invoking `pr-loop` explicitly requests the complete composite procedure, including any native read-only subagent dispatches required by its sibling phases. Do not pause for separate user confirmation merely to launch those required subagents. If a host policy nevertheless refuses a required dispatch solely because the user did not literally say "use subagents", do not stop or ask the user to repeat the request: execute that analysis step in the top-level orchestrator against the same frozen snapshot, preserve the sibling's read-only/state-validation constraints, and record the phase as `inline-fallback`. This compatibility fallback is only for host-level literal-authorization gating. Registry absence is recoverable only when locating sibling skills or support resources that remain accessible through ordinary file access; it never converts missing or incompatible native-subagent capability into inline execution. The fallback must not mask an accepted subagent failure or timeout, and it must not override an explicit user/runtime requirement for independent subagents.
+1. For an Issue start, run `issue-to-pr` for the complete requested Issue set and continue only after `STATUS: complete` with a verified PR.
+2. Freeze the current PR head as `reviewed_target`.
+3. Run `pr-review` for that exact SHA with publication enabled. Continue only after `STATUS: reviewed` and `REVIEWED_HEAD == reviewed_target`.
+4. Run `pr-feedback-triage` against the latest live PR state and retain its exact final head and feedback snapshot. Continue only after `STATUS: complete`.
+5. Re-fetch the live head and complete feedback:
+   - if feedback changed while the head stayed the same, triage again;
+   - if the head changed, start another review round;
+   - if state matches the retained triage snapshot and the head equals the latest reviewed head, continue.
+6. Stop if any active reviewer/merge blocker remains; otherwise succeed.
 
-## Composition invariants
+Do not clear reviewer state merely to satisfy the loop.
 
-- The composite orchestrator owns cross-phase state, phase transitions, and final success validation. Repository/GitHub mutation ownership inside each phase follows that sibling's contract; compatible implementation workers are allowed only where the sibling explicitly permits them and must preserve its single-writer boundary.
-- Project/runtime instructions may choose compatible agent names, models, and implementation routing. `pr-loop` must not override those choices merely to impose a fixed topology; it enforces the sibling capability contracts instead.
-- Advance only after the active sibling procedure reaches its documented successful terminal state, including an explicitly documented `inline-fallback` success mode. A recoverable authorization-only host-policy refusal, a missing skill/support-file registry entry when the resource remains accessible through ordinary file access, or earlier direct work is not itself terminal: refresh the relevant snapshot and resume the current phase. Propagate `unsupported` when a sibling reports a genuine capability/resource failure, a mandatory operation is unavailable, or an effective finite bound cannot be enforced; otherwise stop on non-success.
-- Bind each `pr-review` invocation to one frozen PR head SHA; an older-head review remains valid historical feedback.
-- Run `pr-feedback-triage` against the latest live PR state after each accepted review, even when that state has advanced beyond the reviewed SHA.
-- Before success, freshly verify that the live head and complete relevant feedback equal the latest triage-complete snapshot retained in the shared orchestration context and that the live head equals the latest reviewed head.
+## Bounds
 
-## Phase contracts
+Keep review-round and triage-restart limits separate. Caller/runtime values override defaults.
 
-- Issue start: execute `issue-to-pr` for the complete requested Issue set. Continue only after `STATUS: complete` and a verified resulting PR with exact planned base and PR-head SHAs; otherwise propagate `unsupported` or stop. Any implementation delegation inside that phase must satisfy `issue-to-pr`'s single-writer and orchestrator-validation contract.
-- Review: freeze the current PR head as `reviewed_target` and execute `pr-review` for that exact PR/SHA with publication enabled. Continue only after `STATUS: reviewed` and `REVIEWED_HEAD == reviewed_target`; `reviewed` already implies verified publication for that frozen head. Accept `REVIEW_MODE: inline-fallback` only under the host-policy compatibility rule above.
-- Triage: execute `pr-feedback-triage` for the same PR against its latest live state under the remaining finite restart bound. Continue only after `STATUS: complete`; retain its exact final head and complete final feedback snapshot directly in the shared orchestration context. Any fix implementation delegation inside that phase must satisfy triage's single-writer and orchestrator-validation contract. Accept `ANALYSIS_MODE: inline-fallback` only under the host-policy compatibility rule above. If fixes were already applied directly before formal triage, do not stop solely for that procedural deviation: take a fresh live snapshot, re-triage every feedback item, validate the current diff/state, and continue from that new snapshot. `awaiting_re_review` remains a composite reviewer/merge blocker and must not be cleared by mutating reviewer state.
+- review rounds: default maximum 3;
+- triage restarts: use `pr-feedback-triage`'s default maximum 9.
 
-## Limits
+If an applicable bound is exhausted, stop. If a required finite bound or mandatory operation cannot be provided, return `unsupported`.
 
-The composite loop keeps separate finite bounds for review rounds and triage restarts. Caller/runtime bounds override portable defaults independently. When no caller/runtime review-round bound is supplied, allow at most 3 review rounds. For triage restarts, when no caller/runtime bound is supplied, use the sibling `pr-feedback-triage` portable default of 9 actual restarts after the initial snapshot. If the runtime cannot enforce an effective finite bound, report `unsupported` before entering the affected loop. Do not infer one bound from the other.
+## Result
 
-One review round is one frozen-head review followed by triage until the live state matches a triage-complete snapshot. Maintain restart accounting in the shared orchestration context across triage reinvocations within that round. Every transition from an analyzed or completed triage state back to a fresh triage snapshot consumes one restart when a numeric limit is used and remains subject to the equivalent runtime bound otherwise. Each `pr-feedback-triage` invocation also uses its own effective feedback-analysis deadline; when none is supplied, that sibling defaults each accepted feedback-analysis dispatch to 900 seconds.
+- `success`: live head/feedback equal the latest triage-complete snapshot, live head equals the latest reviewed head, and no reviewer/merge blocker remains.
+- `stopped`: a phase, state check, permission, exhausted bound, or reviewer/merge blocker prevents success.
+- `unsupported`: a required capability/resource or finite bound is unavailable.
 
-## Flow
-
-```mermaid
-flowchart TD
-  S{Starting point} -->|Issue| I[Execute issue-to-pr]
-  S -->|Existing PR| A[Freeze current head]
-  I --> J{Complete?}
-  J -->|no| X[Stopped or unsupported]
-  J -->|yes| A
-  A --> B[Execute pr-review on frozen head]
-  B --> C{Reviewed exact head?}
-  C -->|no| X
-  C -->|yes| D[Execute pr-feedback-triage on latest live state]
-  D --> E{Complete?}
-  E -->|no| X
-  E -->|yes| F{Fresh live state equals triage-complete snapshot?}
-  F -->|no, bound permits| D
-  F -->|no, exhausted| X
-  F -->|yes| G{Final head equals reviewed head?}
-  G -->|no, bound permits| A
-  G -->|no, exhausted| X
-  G -->|yes| H{Reviewer or merge blocker?}
-  H -->|yes| X
-  H -->|no| Y[Success]
-```
-
-The post-triage check re-fetches the live PR head and complete relevant paginated feedback and compares them directly with the retained triage-complete snapshot. Same-head feedback divergence returns to triage before any new review; a stable triage result on a different head starts the next review round.
-
-## Outcomes
-
-- `success`: the fresh live state equals the latest triage-complete snapshot, its head equals the latest verified reviewed head, and no composite reviewer/merge blocker remains.
-- `stopped`: a sibling phase, state validation, permission, exhausted finite bound, or reviewer/merge blocker prevents success.
-- `unsupported`: a sibling's required capability or bundled resource is genuinely unavailable, a mandatory repository/GitHub operation is unavailable, or an effective finite bound cannot be enforced. Authorization-only subagent refusal alone may use the documented inline fallback. Skill/support-file registry absence alone is recovered through ordinary file access when the resource remains accessible; missing or incompatible native-subagent capability remains `unsupported`.
-
-## Output
-
-Report concisely:
-
-- outcome;
-- implemented Issues and resulting PR when applicable;
-- review rounds, review execution mode, and final reviewed head;
-- triage analysis mode, final head, and restart usage;
-- remaining reviewer/user action or blocker.
+Report the outcome, resulting PR/Issues when applicable, review rounds and final reviewed head, triage final head/restarts, and any remaining action or blocker.

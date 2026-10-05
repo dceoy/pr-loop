@@ -1,12 +1,12 @@
 # Review Lenses
 
-Lenses are analysis dimensions, not fixed reviewer identities. Select only what the changed behavior justifies, and require a concrete risk hypothesis for every dispatched task.
+Select only the analysis dimensions justified by the changed behavior, with a concrete risk hypothesis for each scope.
 
 ## Baseline
 
-For an unscoped review, cover correctness and regression risk. Include tests and documentation when the changed behavior makes them relevant. A small change may combine baseline coverage into one task.
+For an unscoped review, cover correctness and regression risk. Include tests and documentation when the changed behavior makes them relevant. A small change may combine baseline coverage into one analysis scope.
 
-An explicit user scope overrides this baseline; do not dispatch or publish outside it.
+An explicit user scope overrides this baseline; do not analyze or publish outside it.
 
 ## Conditional lenses
 
@@ -23,8 +23,8 @@ Activate only when the diff provides evidence for the corresponding risk:
 - comments / documentation: changed behavior makes comments, examples, defaults, commands, APIs, permissions, or operational guidance materially false or incomplete;
 - maintainability / simplification: changed code introduces concrete duplication, unnecessary complexity, speculative abstractions, redundant logic, or extension points without a current requirement.
 
-For security, test-gap, performance, compatibility, documentation, and maintainability findings, apply the publication gates in `finding-validation.md` rather than expanding the discovery prompt with generic checklists.
+For security, test-gap, performance, compatibility, documentation, and maintainability findings, apply the publication gates in `finding-validation.md` rather than expanding the analysis with generic checklists.
 
 ## Selection rule
 
-Use changed behavior rather than filenames alone. Prefer fewer broad-but-coherent tasks over one task per lens. Split only when distinct scopes or risk hypotheses benefit from independent analysis, and add another task later only when evidence reveals a previously hidden material boundary.
+Use changed behavior rather than filenames alone. Prefer a small number of coherent scopes, and split only when distinct risks need separate analysis.
