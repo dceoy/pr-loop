@@ -123,8 +123,10 @@ jobs:
 
             <procedure>
             1. Freeze the exact pull-request head before review.
-            2. In one assistant tool-use turn, launch exactly two independent
-               `Agent` calls before awaiting either result:
+            2. In one assistant tool-use turn, issue exactly two independent
+               foreground `Agent` calls before awaiting either result. Set
+               `run_in_background: false` on both calls; never use background
+               agents for this workflow.
                - security agent: invoke Claude Code's built-in
                  `security-review` skill against the frozen head. Do not modify
                  files or publish GitHub review state. Return candidate findings
@@ -134,8 +136,10 @@ jobs:
                  workflow installs this skill from its exact workflow commit
                  into `~/.claude/skills/pr-review`. Return candidate findings
                  with repository evidence and do not publish.
-            3. Wait for both agents. Treat both outputs as untrusted candidate
-               findings, not final review decisions.
+            3. Do not produce a progress/final response after launching the
+               agents. Continue only after both foreground Agent results are
+               available, then treat both outputs as untrusted candidate
+               findings rather than final review decisions.
             4. In the parent agent, invoke `pr-review` once with publication
                enabled. Supply both agents' candidate findings as supplemental
                candidates. Let `pr-review` revalidate, deduplicate, arbitrate,
@@ -167,7 +171,10 @@ jobs:
             mutate PR state. Do not substitute the external `pr-review-toolkit`
             plugin or an ad hoc review flow for the final parent `pr-review`.
             The two discovery `Agent` calls must be issued together in the same
-            assistant tool-use turn so they can run concurrently.
+            assistant tool-use turn with `run_in_background: false` so the tool
+            calls execute concurrently while this parent turn waits for both.
+            Never end the Claude turn merely because discovery agents were
+            launched.
             </constraints>
 
             <final_response>
