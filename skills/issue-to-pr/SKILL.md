@@ -37,6 +37,31 @@ QUESTION: <smallest missing material decision>
 6. Atomically create and verify the remote branch.
 7. Open and re-fetch the PR; finish only when its base/head state matches the intended commit.
 
+## Flow
+
+```mermaid
+flowchart TD
+  A[Resolve Issues and freeze base snapshot] --> B{All Issues in one repository?}
+  B -->|no| X[Stopped]
+  B -->|yes| C[Produce decision-complete plan]
+  C --> D{Plan ready?}
+  D -->|blocked| E{Missing decision obtained?}
+  E -->|no| X
+  E -->|yes| A
+  D -->|yes| F[Create isolated worktree from frozen base]
+  F --> G[Implement and run scoped QA]
+  G --> H{QA passes?}
+  H -->|no, fixable in scope| G
+  H -->|no| X
+  H -->|yes| I[Re-fetch Issues]
+  I --> J{Material requirements changed?}
+  J -->|yes| A
+  J -->|no| K[Validate diff and commit]
+  K --> L[Atomically create and verify remote branch]
+  L --> M[Open and verify PR]
+  M --> N[Complete]
+```
+
 ## Result
 
 Return `STATUS: complete | stopped | unsupported`.
