@@ -5,11 +5,11 @@
 `pr-loop` provides four portable skills that can be used independently, with `pr-loop` composing the other three into an end-to-end Issue/PR loop.
 
 - [`issue-to-pr`](skills/issue-to-pr/SKILL.md): implement same-repository Issues and stop after creating and verifying the PR.
-- [`pr-review`](skills/pr-review/SKILL.md): review one frozen PR head with adaptive independent analysis and verified `COMMENT` publication.
+- [`pr-review`](skills/pr-review/SKILL.md): review one frozen PR head with adaptive risk-driven analysis and verified `COMMENT` publication.
 - [`pr-feedback-triage`](skills/pr-feedback-triage/SKILL.md): reconcile feedback against the latest live head, apply focused fixes, and finish replies/resolutions.
 - [`pr-loop`](skills/pr-loop/SKILL.md): compose those phases until the stable final head is reviewed, triaged, and unblocked.
 
-Each standalone skill owns its own mechanics and result contract. The composite skill invokes the same procedures in one top-level context rather than duplicating or delegating their policies.
+Each standalone skill owns its own mechanics and result contract. The composite skill executes the same procedures in one shared orchestration context without duplicating their policies.
 
 ## Flow
 
@@ -29,23 +29,25 @@ For an existing pull request, `pr-loop` starts at `pr-review`.
 
 ## Core guarantees
 
-- Single writer: repository and GitHub mutations remain owned by the top-level agent; delegated analysis is read-only.
+- Single writer: at most one repository writer is active during a mutation phase, and GitHub mutations are serialized against validated state.
 - Exact implementation base: `issue-to-pr` binds implementation to an exact base and creates a fresh verified PR branch.
 - Frozen-head review: `pr-review` analyzes one immutable snapshot and, when composed, publishes explicitly against that reviewed SHA.
 - Live-head triage: `pr-feedback-triage` follows current head/feedback changes and rejects stale prepared actions before mutation.
 - Final-head review: if triage changes the head, `pr-loop` starts another review round before success.
-- Fail closed: unsupported isolation, unsafe repository state, unresolved QA/publication failures, stale state, exhausted caller limits, or reviewer/merge blockers stop the relevant procedure.
+- Fail closed: unsafe repository state, unresolved QA/publication failures, stale state, exhausted caller limits, missing mandatory capabilities, or reviewer/merge blockers stop the relevant procedure.
 
 ## Requirements
 
 - Git and authenticated GitHub access through `gh` or an equivalent integration.
-- A coding-agent runtime with GitHub/repository access and finite loop bounds. Native independent read-only subagents are preferred and remain the default analysis path; when a host refuses subagent dispatch only because the user did not literally request subagents, the skills use an explicitly reported inline compatibility fallback instead of stopping. `pr-loop` defaults to 3 review rounds, while `pr-feedback-triage` defaults to 900 seconds per accepted delegated feedback-analysis dispatch and 9 triage restarts when callers do not specify overrides.
+- A coding-agent runtime with GitHub/repository access and finite loop bounds. `pr-loop` defaults to 3 review rounds, while `pr-feedback-triage` defaults to 9 triage restarts when callers do not specify overrides.
 
 ## Runtime integration
 
-`pr-loop` is runtime- and model-agnostic. It keeps only runtime discovery adapters that expose this repository's skills, such as `.agents/skills/` and `.claude/skills`; shared Codex/Claude agent policy and model-routing configuration are not duplicated here. Skill/support-file registry entries are convenience discovery mechanisms, not execution prerequisites: ordinary relative file access is valid when those resources are present. Registry absence for a skill or support file must not by itself stop the loop, but native-subagent capability and isolation requirements remain governed by each skill contract.
+`pr-loop` is runtime- and model-agnostic. It keeps only runtime discovery adapters that expose this repository's skills, such as `.agents/skills/` and `.claude/skills`; shared agent policy and model-routing configuration are not duplicated here. Skill/support-file registry entries are convenience discovery mechanisms, not execution prerequisites: ordinary relative file access is valid when those resources are present. Registry absence for a skill or support file must not by itself stop the loop.
 
-Optional shared runtime configuration, including Codex custom subagents and Claude project defaults, is maintained separately in [`dceoy/ai-coding-agent-skills`](https://github.com/dceoy/ai-coding-agent-skills).
+Execution topology is intentionally outside the skill contracts. The active runtime, agent, and model decide how to perform or distribute analysis and implementation work while satisfying the skills' snapshot, mutation, validation, and result invariants.
+
+Optional shared runtime configuration is maintained separately in [`dceoy/ai-coding-agent-skills`](https://github.com/dceoy/ai-coding-agent-skills).
 
 ## Reusable workflow
 
@@ -72,7 +74,7 @@ It runs Claude Code's built-in `security-review` followed by this repository's `
 ```text
 Implement https://github.com/OWNER/REPO/issues/123 with issue-to-pr
 Implement https://github.com/OWNER/REPO/issues/123 with pr-loop
-Run pr-loop on https://github.com/OWNER/REPO/pull/456  # review/feedback-analysis/retriage bounds are optional
+Run pr-loop on https://github.com/OWNER/REPO/pull/456  # review/triage bounds are optional
 Review https://github.com/OWNER/REPO/pull/456 with pr-review
 Triage https://github.com/OWNER/REPO/pull/456 with pr-feedback-triage
 ```
@@ -81,4 +83,4 @@ See each linked `SKILL.md` for its standalone contract and `skills/pr-loop/SKILL
 
 ## Background
 
-`pr-loop` is a native-subagent rewrite of the former [`oracle-pr-loop`](https://github.com/dceoy/oracle-pr-loop) workflow without Oracle, browser automation, fixed-model, or nested coding-agent CLI dependencies.
+`pr-loop` is an agent-native rewrite of the former [`oracle-pr-loop`](https://github.com/dceoy/oracle-pr-loop) workflow without Oracle, browser automation, fixed-model, or nested coding-agent CLI dependencies.
