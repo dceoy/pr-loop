@@ -64,17 +64,18 @@ jobs:
             skills/pr-review
           persist-credentials: false
       - name: Install reusable workflow PR review skill
-        id: install-review-skill
         run: |
           skill_dir="${HOME}/.claude/skills/pr-review"
           backup_dir="${RUNNER_TEMP}/pr-review-skill-backup"
+          state_file="${RUNNER_TEMP}/pr-review-skill-state"
+          rm -f "${state_file}"
           mkdir -p "${HOME}/.claude/skills"
           if [[ -e "${skill_dir}" || -L "${skill_dir}" ]]; then
             rm -rf "${backup_dir}"
             mv "${skill_dir}" "${backup_dir}"
-            printf 'restore=true\n' >> "${GITHUB_OUTPUT}"
+            printf 'restore\n' > "${state_file}"
           else
-            printf 'restore=false\n' >> "${GITHUB_OUTPUT}"
+            printf 'remove\n' > "${state_file}"
           fi
           cp -R .pr-loop-workflow/skills/pr-review "${skill_dir}"
           printf '/.pr-loop-workflow/\n' >> .git/info/exclude
@@ -196,32 +197,67 @@ jobs:
           fi
 
           if ! jq -e '
-            any(
-              .[];
-              .type == "assistant"
-              and (
-                [
-                  .message.content[]?
-                  | select(.type == "tool_use" and .name == "Agent")
-                ]
-                | length
-              ) >= 2
-            )
+            . as $events
+            | [
+                $events[]
+                | select(
+                    .type == "assistant"
+                    and (.parent_tool_use_id == null)
+                  )
+                | . as $event
+                | .message.content[]?
+                | select(
+                    .type == "tool_use"
+                    and .name == "Agent"
+                    and .input.run_in_background == false
+                  )
+                | {
+                    message_id: $event.message.id,
+                    tool_use_id: .id
+                  }
+              ] as $calls
+            | [
+                $calls
+                | group_by(.message_id)[]
+                | select(length == 2)
+              ] as $groups
+            | any(
+                $groups[];
+                . as $group
+                | all(
+                    $group[];
+                    .tool_use_id as $id
+                    | any(
+                        $events[];
+                        .type == "user"
+                        and any(
+                          .message.content[]?;
+                          .type == "tool_result"
+                          and .tool_use_id == $id
+                          and ((.is_error // false) == false)
+                        )
+                      )
+                  )
+              )
           ' "${CLAUDE_EXECUTION_FILE}" >/dev/null; then
-            echo "::error::expected two Agent calls in one assistant tool-use turn"
+            echo "::error::expected two successful foreground Agent calls in one assistant response"
             exit 1
           fi
 
           if ! jq -e '
-            [
-              .[]
-              | select(.type == "assistant")
-              | .message.content[]?
-              | select(.type == "tool_use" and .name == "Skill")
-            ]
-            | length >= 1
+            any(
+              .[];
+              .type == "assistant"
+              and (.parent_tool_use_id == null)
+              and any(
+                .message.content[]?;
+                .type == "tool_use"
+                and .name == "Skill"
+                and ((.input.skill // .input.name // "") == "pr-review")
+              )
+            )
           ' "${CLAUDE_EXECUTION_FILE}" >/dev/null; then
-            echo "::error::expected parent pr-review Skill invocation"
+            echo "::error::expected top-level pr-review Skill invocation"
             exit 1
           fi
       - name: Verify published PR review
@@ -258,13 +294,16 @@ jobs:
             "${new_review_ids[0]}" "${PR_HEAD_SHA}"
       - name: Restore runner PR review skill
         if: always()
-        env:
-          RESTORE_REVIEW_SKILL: ${{ steps.install-review-skill.outputs.restore }}
         run: |
           skill_dir="${HOME}/.claude/skills/pr-review"
           backup_dir="${RUNNER_TEMP}/pr-review-skill-backup"
+          state_file="${RUNNER_TEMP}/pr-review-skill-state"
+          if [[ ! -f "${state_file}" ]]; then
+            exit 0
+          fi
+          state="$(cat "${state_file}")"
           rm -rf "${skill_dir}"
-          if [[ "${RESTORE_REVIEW_SKILL}" == "true" ]]; then
+          if [[ "${state}" == "restore" ]]; then
             mv "${backup_dir}" "${skill_dir}"
           fi
       - name: Diagnose Claude Code failure
