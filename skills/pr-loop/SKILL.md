@@ -7,7 +7,7 @@ description: Implement same-repository GitHub Issues into a reviewed pull reques
 
 Compose [`issue-to-pr`](../issue-to-pr/SKILL.md), [`pr-review`](../pr-review/SKILL.md), and [`pr-feedback-triage`](../pr-feedback-triage/SKILL.md) until the stable final PR head is reviewed, triaged, and unblocked.
 
-Each sibling owns its standalone mechanics and safety contract. Resolve bundled sibling/support files through normal skill or file access; a missing registry entry alone is not a failure.
+Each sibling owns its standalone mechanics and safety contract.
 
 ## Procedure
 
