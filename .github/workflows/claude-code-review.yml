@@ -54,6 +54,21 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
           persist-credentials: false
+      - name: Checkout reusable workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .pr-loop-workflow
+          sparse-checkout: |
+            skills/pr-review
+          persist-credentials: false
+      - name: Install reusable workflow PR review skill
+        run: |
+          mkdir -p "${HOME}/.claude/skills"
+          rm -rf "${HOME}/.claude/skills/pr-review"
+          cp -R .pr-loop-workflow/skills/pr-review "${HOME}/.claude/skills/pr-review"
+          printf '/.pr-loop-workflow/\n' >> .git/info/exclude
       - name: Initialize origin HEAD at pull request base
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -101,9 +116,10 @@ jobs:
             1. Invoke Claude Code's built-in `security-review` skill through the
                `Skill` tool against the checked-out pull-request head. Keep its
                findings as supplemental candidate findings.
-            2. Invoke this repository's `pr-review` skill through the `Skill`
-               tool. Treat `.claude/skills/pr-review/SKILL.md` (backed by
-               `skills/pr-review/SKILL.md`) as the authoritative review procedure.
+            2. Invoke the reusable workflow's `pr-review` skill through the
+               `Skill` tool. The workflow installs that skill from its exact
+               workflow commit into `~/.claude/skills/pr-review`; treat it and
+               its bundled references as the authoritative review procedure.
             3. Carry any `security-review` findings into `pr-review` and execute
                `pr-review` through arbitration, publication, and post-publication
                verification.
