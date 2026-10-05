@@ -60,6 +60,27 @@ jobs:
         run: |
           git update-ref refs/remotes/origin/pr-review-base "${PR_BASE_SHA}"
           git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/pr-review-base
+      - name: Snapshot existing skill reviews
+        id: review-baseline
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          baseline="${RUNNER_TEMP}/pr-review-existing-ids"
+          marker="<!-- pr-review-skill-run: ${PR_HEAD_SHA}-"
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews?per_page=100" \
+            | jq -r \
+                --arg head "${PR_HEAD_SHA}" \
+                --arg marker "${marker}" \
+                '.[] |
+                 select(.state == "COMMENTED") |
+                 select(.commit_id == $head) |
+                 select((.body // "") | contains("<!-- pr-review-skill -->")) |
+                 select((.body // "") | contains($marker)) |
+                 .id' \
+            | sort -n -u > "${baseline}"
+          printf 'path=%s\n' "${baseline}" >> "${GITHUB_OUTPUT}"
       - name: Run comprehensive PR review
         id: claude-review
         uses: anthropics/claude-code-action@8ce9314fa9a404564fa7e954cd84f25bcba2b829  # v1.0.236
@@ -123,6 +144,37 @@ jobs:
             </final_response>
 
           claude_args: ${{ format('{0} --permission-mode=auto', inputs.claude-args) }}
+      - name: Verify published PR review
+        if: steps.claude-review.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REVIEW_BASELINE_PATH: ${{ steps.review-baseline.outputs.path }}
+        run: |
+          current="${RUNNER_TEMP}/pr-review-current-ids"
+          marker="<!-- pr-review-skill-run: ${PR_HEAD_SHA}-"
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews?per_page=100" \
+            | jq -r \
+                --arg head "${PR_HEAD_SHA}" \
+                --arg marker "${marker}" \
+                '.[] |
+                 select(.state == "COMMENTED") |
+                 select(.commit_id == $head) |
+                 select((.body // "") | contains("<!-- pr-review-skill -->")) |
+                 select((.body // "") | contains($marker)) |
+                 .id' \
+            | sort -n -u > "${current}"
+
+          mapfile -t new_review_ids < <(
+            comm -13 "${REVIEW_BASELINE_PATH}" "${current}"
+          )
+          if (("${#new_review_ids[@]}" != 1)); then
+            echo "::error::expected exactly one new verified pr-review COMMENT review for head ${PR_HEAD_SHA}; found ${#new_review_ids[@]}"
+            exit 1
+          fi
+          printf 'Verified pr-review COMMENT review %s for %s\n' \
+            "${new_review_ids[0]}" "${PR_HEAD_SHA}"
       - name: Diagnose Claude Code failure
         if: always()
         env:
