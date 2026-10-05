@@ -43,6 +43,40 @@ Assign every item one disposition: `fix`, `already addressed`, `outdated`, `answ
 
 If fixes already exist before formal triage, refresh the live snapshot and validate those changes against the resulting dispositions instead of failing solely on procedure order.
 
+## Flow
+
+```mermaid
+flowchart TD
+  A[Snapshot live head and feedback] --> B[Analyze and validate dispositions]
+  B --> C{State still current?}
+  C -->|no, bound permits| A
+  C -->|no, exhausted| X[Stopped]
+  C -->|yes| D{Fixes needed?}
+  D -->|yes| E[Apply smallest fixes and run scoped QA]
+  E --> F{QA passes?}
+  F -->|no, fixable in scope| E
+  F -->|no| X
+  F -->|yes| G[Revalidate state and diff, then commit]
+  G --> H[Expected-SHA push and verify remote]
+  H --> I{Push verified?}
+  I -->|remote changed| A
+  I -->|persistent failure| X
+  I -->|yes| J[Set expected_head to pushed SHA]
+  D -->|no| K[Set expected_head to analyzed head]
+  J --> L[Revalidate expected_head]
+  K --> L
+  L --> M{State still current?}
+  M -->|no, bound permits| A
+  M -->|no, exhausted| X
+  M -->|yes| N[Reply and resolve eligible threads]
+  N --> O{Final state matches expected state?}
+  O -->|no, bound permits| A
+  O -->|no, exhausted| X
+  O -->|yes| P{Completion blocker?}
+  P -->|yes| X
+  P -->|no| Q[Complete]
+```
+
 ## Restart and blockers
 
 The default restart limit is 9 actual restarts after the initial snapshot; a caller/runtime bound may override it. Stop with `limit_exhausted` when the bound is consumed.
