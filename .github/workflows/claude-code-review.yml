@@ -113,16 +113,14 @@ jobs:
             </task>
 
             <procedure>
-            1. Invoke Claude Code's built-in `security-review` skill through the
-               `Skill` tool against the checked-out pull-request head. Keep its
-               findings as supplemental candidate findings.
-            2. Invoke the reusable workflow's `pr-review` skill through the
+            1. Invoke the reusable workflow's `pr-review` skill through the
                `Skill` tool. The workflow installs that skill from its exact
                workflow commit into `~/.claude/skills/pr-review`; treat it and
                its bundled references as the authoritative review procedure.
-            3. Carry any `security-review` findings into `pr-review` and execute
-               `pr-review` through arbitration, publication, and post-publication
-               verification.
+            2. Execute `pr-review` through analysis, arbitration, publication,
+               and post-publication verification. Let its risk-driven review
+               lenses cover security and trust-boundary risks when justified by
+               the diff; do not invoke a separate terminal review skill first.
             </procedure>
 
             <completion_criteria>
@@ -145,10 +143,9 @@ jobs:
             </completion_criteria>
 
             <constraints>
-            Do not modify repository files. Treat `security-review` findings only
-            as supplemental candidates; let `pr-review` validate, deduplicate,
-            and arbitrate them. Do not substitute the external
-            `pr-review-toolkit` plugin or an ad hoc review flow.
+            Do not modify repository files. Do not substitute the external
+            `pr-review-toolkit` plugin, another terminal review skill, or an ad
+            hoc review flow for `pr-review`.
             </constraints>
 
             <final_response>
