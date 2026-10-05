@@ -95,8 +95,6 @@ jobs:
             <task>
             Review ${{ github.repository }} pull request #${{ github.event.pull_request.number }}
             and publish exactly one consolidated COMMENT pull-request review.
-            Follow `pr-review`'s review contract; execution strategy is left to
-            Claude Code and the selected model.
             </task>
 
             <procedure>
