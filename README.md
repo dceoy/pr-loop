@@ -39,11 +39,11 @@ For an existing pull request, `pr-loop` starts at `pr-review`.
 ## Requirements
 
 - Git and authenticated GitHub access through `gh` or an equivalent integration.
-- A coding-agent runtime with native independent read-only subagents and the ability to enforce finite dispatch deadlines. `pr-loop` defaults to 3 review rounds, while `pr-feedback-triage` defaults to 900 seconds per feedback-analysis dispatch and 9 triage restarts when callers do not specify overrides.
+- A coding-agent runtime with GitHub/repository access and finite loop bounds. Native independent read-only subagents are preferred and remain the default analysis path; when a host refuses subagent dispatch only because the user did not literally request subagents, the skills use an explicitly reported inline compatibility fallback instead of stopping. `pr-loop` defaults to 3 review rounds, while `pr-feedback-triage` defaults to 900 seconds per accepted delegated feedback-analysis dispatch and 9 triage restarts when callers do not specify overrides.
 
 ## Runtime integration
 
-`pr-loop` is runtime- and model-agnostic. It keeps only runtime discovery adapters that expose this repository's skills, such as `.agents/skills/` and `.claude/skills`; shared Codex/Claude agent policy and model-routing configuration are not duplicated here.
+`pr-loop` is runtime- and model-agnostic. It keeps only runtime discovery adapters that expose this repository's skills, such as `.agents/skills/` and `.claude/skills`; shared Codex/Claude agent policy and model-routing configuration are not duplicated here. Skill/support-file registry entries are convenience discovery mechanisms, not execution prerequisites: ordinary relative file access is valid, and registry-only host limitations must not by themselves stop the loop.
 
 Optional shared runtime configuration, including Codex custom subagents and Claude project defaults, is maintained separately in [`dceoy/ai-coding-agent-skills`](https://github.com/dceoy/ai-coding-agent-skills).
 
