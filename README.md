@@ -60,11 +60,17 @@ jobs:
 ```
 
 The workflow invokes the bundled `pr-review` once and lets that skill own the
-full review lifecycle. When Claude Code exposes its built-in `security-review`
-Skill, `pr-review` uses it as a read-only supplemental discovery pass, then
-revalidates and deduplicates those candidates before publishing exactly one
-verified COMMENT review. If the built-in skill is unavailable, the normal
-`pr-review` analysis continues without it.
+full review lifecycle. `pr-review` can augment its normal review with a
+runtime-native first-party security pass: Claude Code's built-in
+`security-review`, or OpenAI Codex Security's `Security Diff Scan` when the
+Codex Security plugin is available in Codex/ChatGPT. Security results are
+read-only supplemental candidates that `pr-review` revalidates and deduplicates
+before publishing exactly one verified COMMENT review.
+
+The bundled Claude Code workflow expects its built-in `security-review` to run
+and verifies the nested Skill invocation from the execution transcript. In
+other runtimes, if no supported first-party security capability is advertised,
+the normal `pr-review` analysis continues without security augmentation.
 
 ## Usage
 
