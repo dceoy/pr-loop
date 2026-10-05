@@ -1,6 +1,6 @@
 # Review Lenses
 
-Lenses are analysis dimensions, not fixed reviewer identities. Select only what the changed behavior justifies, and require a concrete risk hypothesis for every selected analysis scope.
+Select only the analysis dimensions justified by the changed behavior, with a concrete risk hypothesis for each scope.
 
 ## Baseline
 
@@ -27,4 +27,4 @@ For security, test-gap, performance, compatibility, documentation, and maintaina
 
 ## Selection rule
 
-Use changed behavior rather than filenames alone. Prefer fewer broad-but-coherent analysis scopes over one scope per lens. Split only when distinct scopes or risk hypotheses benefit from separate analysis, and add another scope later only when evidence reveals a previously hidden material boundary.
+Use changed behavior rather than filenames alone. Prefer a small number of coherent scopes, and split only when distinct risks need separate analysis.
