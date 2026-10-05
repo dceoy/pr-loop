@@ -11,7 +11,7 @@ Implement one or more same-repository Issues in one pull request. Stop after cre
 
 - Freeze the requested Issue set, repository instructions, target base branch, and exact base SHA before planning.
 - Plan and implement against that frozen snapshot. If an Issue changes materially before commit, discard stale work, refresh the snapshot, and plan again.
-- Use one isolated worktree rooted at the frozen base. Preserve unrelated local work and keep changes within the accepted plan.
+- Use one isolated worktree rooted at the frozen base, with at most one active writer. Preserve unrelated local work and keep changes within the accepted plan.
 - Before commit, verify the worktree/base binding, final diff, Issue requirements, and required QA.
 - Publish only a fresh branch. Create the remote ref atomically only if absent, then verify it points to the intended commit.
 - Open a PR for the requested Issues and verify repository, base, head ref, and head SHA.
