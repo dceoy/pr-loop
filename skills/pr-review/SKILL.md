@@ -1,23 +1,21 @@
 ---
 name: pr-review
-description: Review a GitHub pull request with adaptive independent subagents, independent finding validation, and one concise high-confidence COMMENT review by default.
+description: Review a GitHub pull request with adaptive risk-driven analysis, finding validation, and one concise high-confidence COMMENT review by default.
 ---
 
 # PR Review
 
-Review one pull request against one frozen base/head snapshot with adaptive discovery, independent validation, orchestrator arbitration, and one verified `COMMENT` review by default.
+Review one pull request against one frozen base/head snapshot with adaptive discovery, explicit finding validation, coordinated arbitration, and one verified `COMMENT` review by default.
 
 This skill is review-only. Do not modify repository files, commits, branches, or pull-request state other than publishing the requested review feedback. Never approve, request changes, merge, or close the pull request unless the user explicitly asks for that separate action.
 
 ## Runtime and composition
 
-The orchestrator owns snapshot construction, task dispatch, candidate arbitration, publication, and final verification. Invoking `pr-review`, directly or through an explicitly invoked caller such as `pr-loop`, explicitly requests the native read-only discovery and validation subagents required by this procedure. Do not ask for a second user confirmation merely to dispatch them.
+The review execution topology is intentionally unspecified. The active runtime, agent, and model decide how discovery and validation are performed or distributed. This skill does not require a particular agent identity, model, provider, or execution topology.
 
-The files under `references/` are bundled support resources for this skill, not separately registered skills, agents, or tools. Resolve them relative to this `SKILL.md` and read them through ordinary skill/file access. Their absence from a host's skill or agent registry is not an unsupported condition. Read [references/subagent-contract.md](references/subagent-contract.md) before dispatching discovery or validation work and enforce it as the authoritative delegated-analysis contract. If a required bundled resource is genuinely inaccessible through ordinary file access, return `unsupported`; do not confuse registry absence with file inaccessibility.
+The files under `references/` are bundled support resources for this skill, not separately registered skills, agents, or tools. Resolve them relative to this `SKILL.md` and read them through ordinary skill/file access. Their absence from a host's skill or agent registry is not an unsupported condition. If a required bundled resource is genuinely inaccessible through ordinary file access, return `unsupported`; do not confuse registry absence with file inaccessibility.
 
-Prefer compatible native subagents. A project-defined reviewer or built-in agent is valid when it satisfies the required fresh-context, read-only, terminal-leaf, snapshot, and bounded-execution properties; this skill does not require a particular provider, model, or agent identity. If a host policy refuses dispatch solely because the user did not literally request subagents, use `REVIEW_MODE: inline-fallback`: the orchestrator performs a bounded discovery pass and a separate validation pass against the same frozen snapshot, does not claim those passes are independent, and continues through publication and verification. Do not use this fallback when the user/runtime explicitly requires independent subagents. If the runtime genuinely lacks a compatible native-subagent facility or cannot satisfy the required isolation or finite dispatch bounds, return `unsupported`; that is a capability failure, not an authorization-only refusal. If a delegated task was accepted and then fails or times out, follow the delegated-analysis recovery contract and return `failed` if recovery does not succeed; never relabel an accepted delegated failure as inline fallback.
-
-This skill may run standalone or as a review phase inside a caller skill. Composition is procedural, not delegation: execute `pr-review` within the caller's shared orchestration context and never launch the skill itself as a subagent. A caller may provide an exact target head SHA, require commit-bound historical publication, and impose stricter orchestration or recovery rules.
+This skill may run standalone or as a review phase inside a caller skill. A caller may provide an exact target head SHA, require commit-bound historical publication, and impose stricter orchestration or recovery rules.
 
 ## Snapshot and scope
 
@@ -25,7 +23,7 @@ Resolve the pull request from a URL, `OWNER/REPO#NUMBER`, CI context, or the cur
 
 Freeze one exact base/head pair before analysis. A caller-supplied head SHA becomes the frozen head; otherwise use the current live head. Bind the changed-file inventory, diff, and all repository evidence to the frozen commits. Prefer direct commit-bound reads; if a mutable PR endpoint must be used, verify the relevant live base/head values immediately before and after that read and discard the result if they changed. Never combine analysis evidence from different snapshots.
 
-Keep the frozen repository/PR identifiers, base SHA, reviewed head SHA, and changed-file inventory in the orchestration context. Retrieve only the commit-bound diff and surrounding context needed by each task rather than retaining an unnecessarily large mutable PR snapshot.
+Keep the frozen repository/PR identifiers, base SHA, reviewed head SHA, and changed-file inventory in the orchestration context. Retrieve only the commit-bound diff and surrounding context needed for the selected analysis scope rather than retaining an unnecessarily large mutable PR snapshot.
 
 Publish by default. If the user explicitly requests `dry-run` or `no-post`, return findings without GitHub mutation. A caller may override inherited default dry-run behavior but not an explicit user instruction.
 
@@ -40,44 +38,27 @@ flowchart TD
   C -->|no| U[Unsupported]
   C -->|yes| D[Build adaptive risk map]
   B -->|no| D
-  D --> P{Native subagent path?}
-  P -->|available and authorized| E[Dispatch compatible fresh discovery tasks within finite budget]
-  P -->|authorization-only refusal| IF[Inline bounded discovery pass]
-  P -->|capability, isolation, or finite bound unavailable| U
-  IF --> IC{Candidates?}
-  IC -->|yes| IV[Inline bounded validation pass]
-  IC -->|no| L[Orchestrator arbitration]
-  IV --> L
-  E --> F{Delegated work succeeded?}
-  F -->|explicit timeout| Q{Safe one-shot timeout recovery available?}
-  Q -->|yes| QE[Redispatch only the expired logical discovery task]
-  QE --> F
-  Q -->|no| X[Failed]
-  F -->|other failure| X
-  F -->|yes| G{Material uncovered boundary and budget remains?}
-  G -->|yes| E
-  G -->|no| H[Deduplicate candidates by root cause]
-  H --> I{Candidates?}
-  I -->|yes| J[Dispatch compatible fresh validation tasks]
-  J --> K{Delegated work succeeded?}
-  K -->|explicit timeout| V{Safe one-shot timeout recovery available?}
-  V -->|yes| VE[Redispatch only the expired logical validation task]
-  VE --> K
-  V -->|no| X
-  K -->|other failure| X
-  K -->|yes| L
-  I -->|no| L
+  D --> E[Run bounded discovery across selected risk scopes]
+  E --> F{Material uncovered boundary?}
+  F -->|yes| E
+  F -->|no| G[Deduplicate candidates by root cause]
+  G --> H{Candidates?}
+  H -->|yes| I[Validate candidates against counterevidence]
+  H -->|no| L[Arbitrate final findings]
+  I --> L
   L --> M{dry-run or no-post?}
   M -->|yes| R[Return findings without publication]
-  M -->|no| N[Orchestrator publishes using GitHub posting contract]
+  M -->|no| N[Publish using GitHub posting contract]
   N --> O{Publication verified?}
-  O -->|no| X
+  O -->|no| X[Failed]
   O -->|yes| Z[Reviewed]
 ```
 
 ## Review procedure
 
-Read [references/review-lenses.md](references/review-lenses.md) to select the smallest credible risk-driven discovery set. Read [references/finding-validation.md](references/finding-validation.md) before validation and orchestrator arbitration. If either required bundled resource is genuinely inaccessible through ordinary file access, return `unsupported`. In `inline-fallback`, perform discovery and validation as two explicit bounded passes in the orchestrator against the same frozen snapshot; validate each candidate from repository evidence before arbitration and do not describe the result as independently validated. Do not validate when every successful discovery pass yields no candidates under the applicable clean-empty convention.
+Read [references/review-lenses.md](references/review-lenses.md) to select the smallest credible risk-driven analysis set. Read [references/finding-validation.md](references/finding-validation.md) before validation and arbitration. If either required bundled resource is genuinely inaccessible through ordinary file access, return `unsupported`.
+
+Discovery proposes candidate defects; validation must actively seek counterevidence before publication. Keep those as logically distinct review stages even when one runtime execution path performs both. Do not validate when discovery yields no candidates.
 
 Publish only confirmed, non-duplicate, PR-scoped findings with credible material impact and proportional remediation. A `needs-human` item may survive only as a concise top-level verification note when one unresolved external fact itself creates material merge risk. Normally publish critical/high and concrete medium findings; suppress low findings unless project policy requires them.
 
@@ -95,8 +76,7 @@ When composed by a caller, return:
 STATUS: reviewed | unsupported | failed
 PR: <OWNER/REPO#NUMBER>
 REVIEWED_HEAD: <sha or none>
-REVIEW_MODE: subagents | inline-fallback
 PUBLISHED_FINDINGS: <count or none>
 ```
 
-`STATUS: reviewed` itself requires verified publication unambiguously associated with the exact frozen reviewed head when publication was required. `REVIEW_MODE: inline-fallback` records reduced reviewer independence but is still a successful review when every frozen-snapshot, arbitration, publication, and verification gate above is satisfied. The caller decides whether a newer live head requires another invocation.
+`STATUS: reviewed` requires verified publication unambiguously associated with the exact frozen reviewed head when publication was required. The caller decides whether a newer live head requires another invocation.
