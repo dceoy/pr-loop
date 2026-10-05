@@ -7,7 +7,7 @@ description: Implement one or more same-repository GitHub Issues into a pull req
 
 Turn one or more same-repository GitHub Issues into an implementation pull request. Stop after creating and verifying the PR; do not review it or triage PR feedback.
 
-An orchestrator coordinates the procedure and owns commit, push, PR creation, and final state validation. Planning follows applicable project/runtime routing: the orchestrator may plan directly or use one compatible fresh independent read-only native subagent. Implementation may run in the orchestrator or in one project/runtime-selected implementation worker, but only one repository writer may be active at a time.
+An orchestrator coordinates the procedure and owns commit, push, PR creation, and final state validation. Planning follows applicable project/runtime routing: the orchestrator may plan directly or use one compatible fresh independent read-only native subagent. Invoking `issue-to-pr`, directly or through an explicitly invoked caller such as `pr-loop`, explicitly requests any planning subagent required by this procedure or applicable routing; do not ask for separate user confirmation merely to launch it. Implementation may run in the orchestrator or in one project/runtime-selected implementation worker, but only one repository writer may be active at a time.
 
 ## Core invariants
 
