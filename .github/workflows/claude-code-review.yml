@@ -54,6 +54,31 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
           persist-credentials: false
+      - name: Checkout reusable workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .pr-loop-workflow
+          sparse-checkout: |
+            skills/pr-review
+          persist-credentials: false
+      - name: Install reusable workflow PR review skill
+        run: |
+          skill_dir="${HOME}/.claude/skills/pr-review"
+          backup_dir="${RUNNER_TEMP}/pr-review-skill-backup"
+          state_file="${RUNNER_TEMP}/pr-review-skill-state"
+          rm -f "${state_file}"
+          mkdir -p "${HOME}/.claude/skills"
+          if [[ -e "${skill_dir}" || -L "${skill_dir}" ]]; then
+            rm -rf "${backup_dir}"
+            mv "${skill_dir}" "${backup_dir}"
+            printf 'restore\n' > "${state_file}"
+          else
+            printf 'remove\n' > "${state_file}"
+          fi
+          cp -R .pr-loop-workflow/skills/pr-review "${skill_dir}"
+          printf '/.pr-loop-workflow/\n' >> .git/info/exclude
       - name: Initialize origin HEAD at pull request base
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -98,51 +123,100 @@ jobs:
             </task>
 
             <procedure>
-            1. Invoke Claude Code's built-in `security-review` skill through the
-               `Skill` tool against the checked-out pull-request head. Keep its
-               findings as supplemental candidate findings.
-            2. Invoke this repository's `pr-review` skill through the `Skill`
-               tool. Treat `.claude/skills/pr-review/SKILL.md` (backed by
-               `skills/pr-review/SKILL.md`) as the authoritative review procedure.
-            3. Carry any `security-review` findings into `pr-review` and execute
-               `pr-review` through arbitration, publication, and post-publication
-               verification.
+            Invoke the reusable workflow's `pr-review` skill once with
+            publication enabled for the pull request above. The workflow
+            installs this skill from its exact workflow commit into
+            `~/.claude/skills/pr-review`.
+
+            Follow the skill through its terminal result. It owns discovery,
+            validation, deduplication, publication, verification, and
+            first-party security augmentation. In this Claude Code workflow,
+            invoke Claude Code's built-in `security-review` through the
+            `Skill` tool as the security discovery pass; do not silently skip
+            it.
             </procedure>
 
             <completion_criteria>
-            The task is complete only when `pr-review` reaches a terminal status
-            under its own contract.
+            The task is complete only when `pr-review` reaches a terminal
+            status under its own contract.
 
-            For `STATUS: reviewed`, publication is required. GitHub must contain
-            exactly one COMMENT review for this invocation and `pr-review` must
-            verify it after posting. If there are no actionable findings, still
-            publish and verify the non-empty clean review required by
-            `pr-review`, including its fresh `pr-review-skill-run` marker.
+            For `STATUS: reviewed`, publication is required. GitHub must
+            contain exactly one COMMENT review for this invocation and
+            `pr-review` must verify it after posting. If there are no
+            actionable findings, still publish and verify the non-empty clean
+            review required by `pr-review`, including its fresh
+            `pr-review-skill-run` marker.
 
             Analysis completion, a progress update, or successful Claude Code
-            execution alone is not task completion. Do not end the turn merely to
-            report what was done or announce the next step while required work
-            remains. Continue with every non-blocked step without asking for
-            confirmation. If the procedure cannot be completed, finish with
-            `STATUS: failed` or `STATUS: unsupported` as defined by
+            execution alone is not task completion. Do not end the turn merely
+            to report what was done or announce the next step while required
+            work remains. Continue with every non-blocked step without asking
+            for confirmation. If the procedure cannot be completed, finish
+            with `STATUS: failed` or `STATUS: unsupported` as defined by
             `pr-review`; never claim `reviewed` without verified publication.
             </completion_criteria>
 
             <constraints>
-            Do not modify repository files. Treat `security-review` findings only
-            as supplemental candidates; let `pr-review` validate, deduplicate,
-            and arbitrate them. Do not substitute the external
-            `pr-review-toolkit` plugin or an ad hoc review flow.
+            Do not modify repository files. Do not substitute the external
+            `pr-review-toolkit` plugin or an ad hoc review flow for
+            `pr-review`. Security review is owned by `pr-review`; do not
+            launch a separate top-level security review. This workflow expects
+            Claude Code's first-party `security-review` capability. If it
+            cannot be invoked, do not claim `STATUS: reviewed`.
             </constraints>
 
             <final_response>
-            After all required work is complete, return the terminal result from
-            `pr-review`. The final response is a report of the completed work,
-            not a substitute for GitHub publication or verification.
+            After all required work is complete, return the terminal result
+            from `pr-review`. The final response is a report of the completed
+            work, not a substitute for GitHub publication or verification.
             </final_response>
 
           claude_args: ${{ format('{0} --permission-mode=auto', inputs.claude-args) }}
+      - name: Verify review skill invocations
+        id: verify-invocation
+        if: steps.claude-review.outcome == 'success'
+        env:
+          CLAUDE_EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
+        run: |
+          if [[ -z "${CLAUDE_EXECUTION_FILE}" || ! -f "${CLAUDE_EXECUTION_FILE}" ]]; then
+            echo "::error::Claude execution transcript is unavailable"
+            exit 1
+          fi
+
+          if ! jq -e '
+            any(
+              .[];
+              .type == "assistant"
+              and (.parent_tool_use_id == null)
+              and any(
+                .message.content[]?;
+                .type == "tool_use"
+                and .name == "Skill"
+                and ((.input.skill // .input.name // "") == "pr-review")
+              )
+            )
+          ' "${CLAUDE_EXECUTION_FILE}" >/dev/null; then
+            echo "::error::expected top-level pr-review Skill invocation"
+            exit 1
+          fi
+
+          if ! jq -e '
+            any(
+              .[];
+              .type == "assistant"
+              and any(
+                .message.content[]?;
+                .type == "tool_use"
+                and .name == "Skill"
+                and ((.input.skill // .input.name // "") == "security-review")
+              )
+            )
+          ' "${CLAUDE_EXECUTION_FILE}" >/dev/null; then
+            echo "::error::expected Claude Code security-review Skill invocation"
+            exit 1
+          fi
       - name: Verify published PR review
+        id: verify-review
         if: steps.claude-review.outcome == 'success'
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
@@ -173,18 +247,45 @@ jobs:
           fi
           printf 'Verified pr-review COMMENT review %s for %s\n' \
             "${new_review_ids[0]}" "${PR_HEAD_SHA}"
+      - name: Restore runner PR review skill
+        if: always()
+        run: |
+          skill_dir="${HOME}/.claude/skills/pr-review"
+          backup_dir="${RUNNER_TEMP}/pr-review-skill-backup"
+          state_file="${RUNNER_TEMP}/pr-review-skill-state"
+          if [[ ! -f "${state_file}" ]]; then
+            exit 0
+          fi
+          state="$(cat "${state_file}")"
+          rm -rf "${skill_dir}"
+          if [[ "${state}" == "restore" ]]; then
+            mv "${backup_dir}" "${skill_dir}"
+          fi
       - name: Diagnose Claude Code failure
         if: always()
         env:
           CLAUDE_EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
           CLAUDE_REVIEW_CONCLUSION: ${{ steps.claude-review.outputs.conclusion }}
           CLAUDE_REVIEW_OUTCOME: ${{ steps.claude-review.outcome }}
+          VERIFY_INVOCATION_OUTCOME: ${{ steps.verify-invocation.outcome }}
+          VERIFY_REVIEW_OUTCOME: ${{ steps.verify-review.outcome }}
         run: |
-          if [[ "${CLAUDE_REVIEW_OUTCOME}" == "success" && ( "${CLAUDE_REVIEW_CONCLUSION}" == "success" || -z "${CLAUDE_REVIEW_CONCLUSION}" ) ]]; then
+          if [[ "${CLAUDE_REVIEW_OUTCOME}" == "success" && ( "${CLAUDE_REVIEW_CONCLUSION}" == "success" || -z "${CLAUDE_REVIEW_CONCLUSION}" ) && "${VERIFY_INVOCATION_OUTCOME}" == "success" && "${VERIFY_REVIEW_OUTCOME}" == "success" ]]; then
             exit 0
           fi
 
           if [[ -n "${CLAUDE_EXECUTION_FILE}" && -f "${CLAUDE_EXECUTION_FILE}" ]]; then
+            jq -c '
+              [
+                .[]
+                | select(.type == "assistant")
+                | .message.content[]?
+                | select(.type == "tool_use")
+                | .name
+              ]
+              | unique
+              | {tool_uses: .}
+            ' "${CLAUDE_EXECUTION_FILE}"
             jq -c '
               [ .[] | select(.type == "result") ]
               | last
@@ -194,6 +295,7 @@ jobs:
                   api_error_status,
                   terminal_reason,
                   stop_reason,
+                  result,
                   errors
                 }
             ' "${CLAUDE_EXECUTION_FILE}"
