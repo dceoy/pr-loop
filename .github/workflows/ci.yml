@@ -72,9 +72,6 @@ jobs:
       security-events: write
       actions: read
     uses: dceoy/gha-for-devops/.github/workflows/github-actions-lint-and-scan.yml@main  # zizmor: ignore[unpinned-uses]
-    with:
-      actionlint-extra-ignore-regex: >-
-        property "(workflow_repository|workflow_sha)" is not defined in object type
   markdown-lint:
     uses: dceoy/gha-for-devops/.github/workflows/markdown-lint.yml@main  # zizmor: ignore[unpinned-uses]
   dependabot-auto-merge:
