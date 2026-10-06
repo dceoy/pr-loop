@@ -54,16 +54,11 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
           persist-credentials: false
-      - name: Checkout reusable workflow source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          repository: ${{ job.workflow_repository }}
-          ref: ${{ job.workflow_sha }}
-          path: .pr-loop-workflow
-          sparse-checkout: |
-            skills/pr-review
-          persist-credentials: false
       - name: Install reusable workflow PR review skill
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+          SKILL_REPOSITORY: ${{ job.workflow_repository }}
+          SKILL_REF: ${{ job.workflow_sha }}
         run: |
           skill_dir="${HOME}/.claude/skills/pr-review"
           backup_dir="${RUNNER_TEMP}/pr-review-skill-backup"
@@ -77,8 +72,11 @@ jobs:
           else
             printf 'remove\n' > "${state_file}"
           fi
-          cp -R .pr-loop-workflow/skills/pr-review "${skill_dir}"
-          printf '/.pr-loop-workflow/\n' >> .git/info/exclude
+          gh skill install "${SKILL_REPOSITORY}" skills/pr-review \
+            --agent claude-code \
+            --scope user \
+            --pin "${SKILL_REF}" \
+            --force
       - name: Initialize origin HEAD at pull request base
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -125,8 +123,8 @@ jobs:
             <procedure>
             Invoke the reusable workflow's `pr-review` skill once with
             publication enabled for the pull request above. The workflow
-            installs this skill from its exact workflow commit into
-            `~/.claude/skills/pr-review`.
+            installs this skill with `gh skill` from its exact workflow
+            commit into `~/.claude/skills/pr-review`.
 
             Follow the skill through its terminal result. It owns discovery,
             validation, deduplication, publication, verification, and
