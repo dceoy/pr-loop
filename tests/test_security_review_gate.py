@@ -209,6 +209,9 @@ class SecurityToolPolicyTest(unittest.TestCase):
             safe = root / "safe"
             safe.mkdir()
             (safe / "source.py").write_text("source\n")
+            metadata = safe / ".git"
+            metadata.mkdir()
+            (metadata / "config").write_text("test metadata\n")
             (root / "escape").symlink_to(secret)
             cases = [
                 ("repository_file", "Read", {"file_path": "source.py"}, True),
@@ -218,6 +221,11 @@ class SecurityToolPolicyTest(unittest.TestCase):
                 ("symlink_escape", "Read", {"file_path": "escape"}, False),
                 ("git_credentials", "Read", {"file_path": ".git/config"}, False),
                 ("repository_glob", "Glob", {"path": str(safe), "pattern": "**/*.py"}, True),
+                ("git_config_glob", "Glob", {"path": str(safe), "pattern": "**/.git/config"}, False),
+                ("git_tree_glob", "Glob", {"path": str(safe), "pattern": "**/.git/**"}, False),
+                ("hidden_wildcard_glob", "Glob", {"path": str(safe), "pattern": "**/.*/*"}, False),
+                ("broad_metadata_glob", "Glob", {"path": str(safe), "pattern": "**/*"}, False),
+                ("bracket_metadata_glob", "Glob", {"path": str(safe), "pattern": "**/.[g]it/config"}, False),
                 ("glob_following_nested_host_link", "Glob", {"pattern": "**/*"}, False),
                 ("host_glob_path", "Glob", {"path": str(secret.parent), "pattern": "*"}, False),
                 ("absolute_glob", "Glob", {"pattern": str(secret)}, False),

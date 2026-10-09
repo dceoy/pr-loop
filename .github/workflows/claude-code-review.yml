@@ -115,6 +115,7 @@ jobs:
         run: |
           # Runner-local policy comes from this exact workflow, not the PR checkout.
           cat > "${RUNNER_TEMP}/security-tool-policy.py" <<'POLICY'
+          import glob
           import json
           import os
           from pathlib import Path
@@ -166,8 +167,18 @@ jobs:
                   if tool == "Glob":
                       pattern = data.get("pattern")
                       if (not isinstance(pattern, str) or Path(pattern).is_absolute()
-                              or ".." in pattern or any(char in pattern for char in "~\\{}")):
+                              or ".." in pattern or ".git" in Path(pattern).parts
+                              or any(char in pattern for char in "~\\{}")):
                           return {"permissionDecision": "deny"}
+                      # Hidden metadata can also be selected by wildcard patterns.
+                      for match in glob.iglob(pattern, root_dir=target, recursive=True,
+                                              include_hidden=True):
+                          matched = target / match
+                          resolved = matched.resolve()
+                          if (".git" in matched.relative_to(root).parts
+                                  or not resolved.is_relative_to(root)
+                                  or ".git" in resolved.relative_to(root).parts):
+                              return {"permissionDecision": "deny"}
                   return {"permissionDecision": "allow"}
               if tool == "Skill" and data.get("skill") == "security-review" and not data.get("args"):
                   return {"permissionDecision": "allow"}
