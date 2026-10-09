@@ -67,8 +67,9 @@ Codex Security plugin is available in Codex/ChatGPT. Security results are
 read-only supplemental candidates that `pr-review` revalidates and deduplicates
 before publishing exactly one verified COMMENT review.
 
-The bundled Claude Code workflow expects its built-in `security-review` to run
-and verifies the nested Skill invocation from the execution transcript. In
+The bundled Claude Code workflow requires a foreground security subagent and
+verifies the nested `security-review` Skill call, its result, and the subagent's
+return from the execution transcript before accepting review publication. In
 other runtimes, if no supported first-party security capability is advertised,
 the normal `pr-review` analysis continues without security augmentation.
 
