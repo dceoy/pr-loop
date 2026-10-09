@@ -45,10 +45,12 @@ supplemental discovery pass against the same frozen base/head snapshot.
 - Prefer an isolated read-only execution path when the runtime supports it. In
   Claude Code, delegate to one foreground Agent/Task whose prompt explicitly
   instructs it to invoke the built-in `security-review` via its `Skill` tool.
-  Do not invoke `security-review` directly in the parent: its terminal result
-  can end the review before publication. After the delegate returns, the parent
-  must resume discovery, arbitration, publication, and verification even when
-  the security pass finds nothing.
+  Set `run_in_background: false`, await the nested Skill result and the
+  successful Agent/Task return, and do not publish if either fails or cannot be
+  confirmed. Do not invoke `security-review` directly in the parent: its
+  terminal result can end the review before publication. After the delegate
+  returns, the parent must resume discovery, arbitration, publication, and
+  verification even when the security pass finds nothing.
 - In Codex or ChatGPT, invoke the first-party Codex Security
   `Security Diff Scan` through the runtime's advertised plugin/skill
   mechanism.
