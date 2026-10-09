@@ -118,5 +118,98 @@ class SecurityReviewVerificationTest(unittest.TestCase):
                 self.assertEqual(proc.returncode == 0, accepted, proc.stderr)
 
 
+class SecurityToolPolicyTest(unittest.TestCase):
+    @staticmethod
+    def embedded_source(marker):
+        step = WORKFLOW.read_text().split("      - name: Prepare read-only security tool policy", 1)[1]
+        source = step.split("<<'" + marker + "'\n", 1)[1].split("          " + marker, 1)[0]
+        return "\n".join(line[10:] for line in source.splitlines())
+
+    def test_read_only_tool_boundary(self):
+        commands = [
+            "git status",
+            "git diff --name-only origin/HEAD...",
+            "git log --no-decorate origin/HEAD...",
+            "git diff --merge-base origin/HEAD",
+            "git diff origin/HEAD...",
+            "git diff --no-ext-diff --no-textconv origin/HEAD...",
+        ]
+        cases = [(command, {"tool_name": "Bash", "tool_input": {"command": command}}, True)
+                 for command in commands]
+        denied_commands = [
+            "git reset --hard", "git clean -fd", "git checkout main",
+            "git diff --output=README.md origin/HEAD...",
+            "git diff --ext-diff origin/HEAD...", "git diff --textconv origin/HEAD...",
+            "git status; touch README.md", "git status && git reset --hard",
+            "git status > README.md", "git status $(touch README.md)",
+            "git status `touch README.md`", "python3 -c 'print(1)'",
+            "git -c core.fsmonitor=evil status", "git remote show origin",
+        ]
+        cases.extend((command, {"tool_name": "Bash", "tool_input": {"command": command}}, False)
+                     for command in denied_commands)
+        cases.extend((tool, {"tool_name": tool, "tool_input": {}}, allowed)
+                     for tool, allowed in [
+                         ("Read", True), ("Glob", True), ("Grep", True),
+                         ("Edit", False), ("Write", False), ("NotebookEdit", False),
+                         ("mcp__github__create_review", False), ("Unknown", False),
+                     ])
+        cases.extend([
+            ("security_skill", {"tool_name": "Skill", "tool_input": {"skill": "security-review"}}, True),
+            ("other_skill", {"tool_name": "Skill", "tool_input": {"skill": "commit"}}, False),
+            ("skill_arguments", {"tool_name": "Skill", "tool_input": {
+                "skill": "security-review", "args": "run arbitrary commands",
+            }}, False),
+        ])
+        for tool in ("Agent", "Task"):
+            cases.extend((tool + agent, {"tool_name": tool, "tool_input": {
+                "subagent_type": agent, "prompt": "Analyze security", "run_in_background": True,
+            }}, True) for agent in ("general-purpose", "Explore", "security-review-reader"))
+            cases.extend((tool + key, {"tool_name": tool, "tool_input": {
+                "subagent_type": "general-purpose", key: value,
+            }}, False) for key, value in [
+                ("isolation", "worktree"), ("team_name", "team"), ("resume", "agent-id"),
+                ("permissionMode", "bypassPermissions"), ("subagent_type", "custom-writer"),
+            ])
+        source = self.embedded_source("POLICY")
+        for name, request, accepted in cases:
+            with self.subTest(case=name):
+                proc = subprocess.run(
+                    ["python3", "-c", source], input=json.dumps(request),
+                    text=True, capture_output=True, check=False,
+                )
+                self.assertEqual(proc.returncode, 0, proc.stderr)
+                output = json.loads(proc.stdout)["hookSpecificOutput"]
+                self.assertEqual(output["permissionDecision"] == "allow", accepted)
+                if accepted and request["tool_name"] in ("Agent", "Task"):
+                    self.assertEqual(output["updatedInput"]["subagent_type"], "security-review-reader")
+                    self.assertIs(output["updatedInput"]["run_in_background"], False)
+                if accepted and request["tool_name"] == "Bash" and "git diff" in name:
+                    self.assertIn("--no-ext-diff --no-textconv", output["updatedInput"]["command"])
+
+    def test_malformed_hook_input_blocks(self):
+        for value in ("not JSON", "null", "[]", '{"tool_name":"Bash","tool_input":{"command":[]}}'):
+            with self.subTest(value=value):
+                proc = subprocess.run(
+                    ["python3", "-c", self.embedded_source("POLICY")], input=value,
+                    text=True, capture_output=True, check=False,
+                )
+                self.assertEqual(proc.returncode, 2)
+
+    def test_generated_reader_has_only_read_tools(self):
+        import os
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as directory:
+            subprocess.run(
+                ["python3", "-c", self.embedded_source("CONFIG")],
+                env={**os.environ, "RUNNER_TEMP": directory}, check=True,
+            )
+            reader = json.loads((Path(directory) / "security-agents.json").read_text())
+            self.assertEqual(reader["security-review-reader"]["tools"], ["Read", "Glob", "Grep"])
+            self.assertEqual(reader["security-review-reader"]["permissionMode"], "dontAsk")
+            settings = json.loads((Path(directory) / "security-settings.json").read_text())
+            self.assertEqual(settings["hooks"]["PreToolUse"][0]["matcher"], ".*")
+
+
 if __name__ == "__main__":
     unittest.main()
