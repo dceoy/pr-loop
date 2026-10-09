@@ -62,20 +62,25 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-The workflow invokes the bundled `pr-review` once and lets that skill own the
-full review lifecycle. `pr-review` can augment its normal review with a
-runtime-native first-party security pass: Claude Code's built-in
-`security-review`, or OpenAI Codex Security's `Security Diff Scan` when the
-Codex Security plugin is available in Codex/ChatGPT. Security results are
-read-only supplemental candidates that `pr-review` revalidates and deduplicates
-before publishing exactly one verified COMMENT review.
+The reusable workflow runs a **single Claude Code Action**, invoking the pinned
+`pr-review` skill once for a frozen pull request head. `pr-review` looks for an
+already available security-review skill, either built-in or third-party. It may
+invoke one compatible skill as optional supplemental discovery, then validates
+and deduplicates any findings before publishing a single verified GitHub
+`COMMENT` review.
 
-The bundled Claude Code workflow first runs and verifies `security-review`
-in a separate Claude Code Action. It passes the completed result to `pr-review`
-for validation and one verified COMMENT publication. This prevents a security
-review's terminal response from ending the parent review prematurely. In
-other runtimes, if no supported first-party security capability is advertised,
-the normal `pr-review` analysis continues without security augmentation.
+If no suitable security-review skill is available, or the runtime cannot invoke
+one, `pr-review` continues on its own (including its normal security review
+lens). It does not install additional security skills or represent a skipped
+scan as completed. When an invoked scan fails, `pr-review` follows its
+fail-closed contract instead of silently treating the result as clean.
+
+The workflow keeps broad caller-configured Claude Code permissions and relies
+on the selected skill to honor the review-only instructions; it does **not**
+enforce a separate read-only security sandbox. A bounded Stop hook discourages
+premature completion, while a subsequent GitHub API check independently
+requires exactly one new `COMMENT` review for the frozen head. This does not
+guarantee a security skill is present or that subagent completion will succeed.
 
 ## Usage
 

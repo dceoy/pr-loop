@@ -42,13 +42,16 @@ Do not hardcode an agent, vendor, model, Skill name, or provider-specific tool.
 - If a caller has already supplied an independently verified security scan for
   the exact frozen base/head, reuse its findings as candidates without rerunning
   the same security review.
-- When one can be run safely, execute it once in a bounded, foreground,
-  read-only delegated task if supported. Deny writes, GitHub publication,
-  unrelated network/host access, and modifications to files or repository state.
-  Require a completed result tied to the frozen base/head before resuming the
-  parent; an invocation or parent session success alone is not completion.
-- If there is **no eligible built-in or third-party Skill**, or no compatible
-  safe execution path, **run pr-review alone** with its normal security lens.
+- Prefer a bounded foreground delegate when supported; otherwise a direct
+  invocation is acceptable if the runtime exposes the skill that way.
+  Scope the scan to the frozen base/head. Instruct it not to modify files,
+  branches, commits, or GitHub review state, and apply runtime tool restrictions
+  where available. The parent runtime may retain broad caller-granted
+  permissions; do not assume the selected skill is sandboxed.
+  Require a completed result tied to the frozen base/head before continuing
+  the parent; an invocation or parent session success alone is not completion.
+- If there is **no eligible built-in or third-party Skill**, or no usable
+  invocation path, **run pr-review alone** with its normal security lens.
   This is a valid review outcome, not a failure or `unsupported`, and must
   not be represented as a completed dedicated security scan.
 - If an explicitly invoked security scan fails, cannot be validated, or cannot
@@ -88,8 +91,8 @@ flowchart TD
   P -->|no| U[Unsupported]
   P -->|yes| D
   C -->|no| D
-  D --> S{Safe security-review Skill available?}
-  S -->|yes| T[Run read-only security discovery]
+  D --> S{Usable security-review Skill available?}
+  S -->|yes| T[Run scoped security discovery]
   S -->|no| E[Discover general candidates]
   T --> E
   E --> F{Candidates?}
