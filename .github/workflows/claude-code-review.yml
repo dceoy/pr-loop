@@ -136,23 +136,42 @@ jobs:
             echo "::error::security-review execution transcript is unavailable"
             exit 1
           fi
+          # Match the Skill call to its successful tool result, not just the
+          # Claude session's terminal status (which can be success after a tool error).
           if ! jq -e '
-            (
-              [
-                .[]
+            . as $log
+            | [
+                range(0; $log | length) as $i
+                | $log[$i]
                 | select(.type == "assistant" and .parent_tool_use_id == null)
                 | .message.content[]?
                 | select(.type == "tool_use" and .name == "Skill")
                 | select((.input.skill // .input.name // "") == "security-review")
-              ] | length == 1
-            )
-            and (
-              [.[] | select(.type == "result")] | last
-              | .subtype == "success" and .is_error == false
-                and (.result | type == "string" and length > 0)
-            )
+                | {id, index: $i}
+              ] as $calls
+            | if ($calls | length) != 1 then false
+              else
+                (
+                  [
+                    range(($calls[0].index + 1); ($log | length)) as $i
+                    | $log[$i]
+                    | select(.type == "user" and .parent_tool_use_id == null)
+                    | .message.content[]?
+                    | select(
+                        .type == "tool_result"
+                        and .tool_use_id == $calls[0].id
+                        and (.is_error != true)
+                      )
+                  ] | length == 1
+                )
+                and (
+                  $log | [.[] | select(.type == "result")] | last
+                  | .subtype == "success" and .is_error == false
+                    and (.result | type == "string" and length > 0)
+                )
+              end
           ' "${SECURITY_EXECUTION_FILE}" >/dev/null; then
-            echo "::error::security-review Skill or successful terminal result missing"
+            echo "::error::security-review Skill result or successful terminal result missing"
             exit 1
           fi
           jq -r '[.[] | select(.type == "result")] | last | .result' \
