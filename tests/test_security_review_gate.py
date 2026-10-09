@@ -2,6 +2,7 @@
 
 import copy
 import json
+import os
 from pathlib import Path
 import subprocess
 import unittest
@@ -147,7 +148,9 @@ class SecurityToolPolicyTest(unittest.TestCase):
         ]
         cases.extend((command, {"tool_name": "Bash", "tool_input": {"command": command}}, False)
                      for command in denied_commands)
-        cases.extend((tool, {"tool_name": tool, "tool_input": {}}, allowed)
+        cases.extend((tool, {"tool_name": tool, "tool_input": {
+            "file_path": str(WORKFLOW), "pattern": "**/*.py",
+        }}, allowed)
                      for tool, allowed in [
                          ("Read", True), ("Glob", True), ("Grep", True),
                          ("Edit", False), ("Write", False), ("NotebookEdit", False),
@@ -177,6 +180,8 @@ class SecurityToolPolicyTest(unittest.TestCase):
             with self.subTest(case=name):
                 proc = subprocess.run(
                     ["python3", "-c", source], input=json.dumps(request),
+                    env={**os.environ, "GITHUB_WORKSPACE": str(WORKFLOW.parents[2]),
+                         "SECURITY_DIFF_FILE": "/tmp/security-review-test.diff"},
                     text=True, capture_output=True, check=False,
                 )
                 self.assertEqual(proc.returncode, 0, proc.stderr)
@@ -188,6 +193,52 @@ class SecurityToolPolicyTest(unittest.TestCase):
                     self.assertIs(request["tool_input"]["run_in_background"], False)
                 if accepted and request["tool_name"] == "Bash" and "git diff" in name:
                     self.assertIn("--no-ext-diff --no-textconv", output["updatedInput"]["command"])
+
+    def test_read_paths_cannot_escape_checkout(self):
+        import os
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "checkout"
+            root.mkdir()
+            secret = Path(directory) / "host-credential"
+            secret.write_text("test credential\n")
+            diff = Path(directory) / "security-review.diff"
+            diff.write_text("frozen diff\n")
+            (root / "source.py").write_text("source\n")
+            safe = root / "safe"
+            safe.mkdir()
+            (safe / "source.py").write_text("source\n")
+            (root / "escape").symlink_to(secret)
+            cases = [
+                ("repository_file", "Read", {"file_path": "source.py"}, True),
+                ("frozen_diff", "Read", {"file_path": str(diff)}, True),
+                ("absolute_host_file", "Read", {"file_path": str(secret)}, False),
+                ("relative_traversal", "Read", {"file_path": "../host-credential"}, False),
+                ("symlink_escape", "Read", {"file_path": "escape"}, False),
+                ("git_credentials", "Read", {"file_path": ".git/config"}, False),
+                ("repository_glob", "Glob", {"path": str(safe), "pattern": "**/*.py"}, True),
+                ("glob_following_nested_host_link", "Glob", {"pattern": "**/*"}, False),
+                ("host_glob_path", "Glob", {"path": str(secret.parent), "pattern": "*"}, False),
+                ("absolute_glob", "Glob", {"pattern": str(secret)}, False),
+                ("traversal_glob", "Glob", {"pattern": "../*"}, False),
+                ("brace_glob_escape", "Glob", {"pattern": "{/etc/*,**/*.py}"}, False),
+                ("repository_grep", "Grep", {"path": str(safe), "pattern": "source"}, True),
+                ("grep_following_nested_host_link", "Grep", {"pattern": "."}, False),
+                ("host_grep", "Grep", {"path": str(secret), "pattern": "."}, False),
+                ("symlink_grep", "Grep", {"path": "escape", "pattern": "."}, False),
+            ]
+            for name, tool, data, accepted in cases:
+                with self.subTest(case=name):
+                    proc = subprocess.run(
+                        ["python3", "-c", self.embedded_source("POLICY")],
+                        input=json.dumps({"tool_name": tool, "tool_input": data, "cwd": str(root)}),
+                        env={**os.environ, "GITHUB_WORKSPACE": str(root), "SECURITY_DIFF_FILE": str(diff)},
+                        text=True, capture_output=True, check=False,
+                    )
+                    self.assertEqual(proc.returncode, 0, proc.stderr)
+                    output = json.loads(proc.stdout)["hookSpecificOutput"]
+                    self.assertEqual(output["permissionDecision"] == "allow", accepted)
 
     def test_malformed_hook_input_blocks(self):
         for value in ("not JSON", "null", "[]", '{"tool_name":"Bash","tool_input":{"command":[]}}'):

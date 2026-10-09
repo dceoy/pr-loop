@@ -117,6 +117,7 @@ jobs:
           cat > "${RUNNER_TEMP}/security-tool-policy.py" <<'POLICY'
           import json
           import os
+          from pathlib import Path
           import sys
 
           # Exact commands used by the published and bundled security-review prompts.
@@ -140,6 +141,33 @@ jobs:
               if not isinstance(data, dict):
                   return {"permissionDecision": "deny"}
               if tool in {"Read", "Glob", "Grep"}:
+                  root = Path(os.environ["GITHUB_WORKSPACE"]).resolve()
+                  value = data.get("file_path") if tool == "Read" else data.get("path", ".")
+                  if not isinstance(value, str):
+                      return {"permissionDecision": "deny"}
+                  path = Path(value).expanduser()
+                  cwd = Path(event.get("cwd", str(root))).resolve()
+                  target = (path if path.is_absolute() else cwd / path).resolve()
+                  diff = Path(os.environ["SECURITY_DIFF_FILE"]).resolve()
+                  if tool == "Read" and target == diff:
+                      return {"permissionDecision": "allow"}
+                  if not target.is_relative_to(root) or ".git" in target.relative_to(root).parts:
+                      return {"permissionDecision": "deny"}
+                  # Search tools may follow descendant links; refuse unsafe search trees.
+                  if tool in {"Glob", "Grep"} and target.is_dir():
+                      for directory, dirs, files in os.walk(target, followlinks=False):
+                          for name in dirs + files:
+                              entry = Path(directory) / name
+                              if entry.is_symlink():
+                                  resolved = entry.resolve()
+                                  if (not resolved.is_relative_to(root)
+                                          or ".git" in resolved.relative_to(root).parts):
+                                      return {"permissionDecision": "deny"}
+                  if tool == "Glob":
+                      pattern = data.get("pattern")
+                      if (not isinstance(pattern, str) or Path(pattern).is_absolute()
+                              or ".." in pattern or any(char in pattern for char in "~\\{}")):
+                          return {"permissionDecision": "deny"}
                   return {"permissionDecision": "allow"}
               if tool == "Skill" and data.get("skill") == "security-review" and not data.get("args"):
                   return {"permissionDecision": "allow"}
@@ -199,6 +227,7 @@ jobs:
         id: claude-security
         env:
           SECURITY_AGENT_AUDIT_FILE: ${{ runner.temp }}/security-subagents.jsonl
+          SECURITY_DIFF_FILE: ${{ runner.temp }}/security-review.diff
           CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1'
           GIT_OPTIONAL_LOCKS: '0'
           GIT_PAGER: cat
@@ -226,7 +255,9 @@ jobs:
             Dispatch only subagent_type="security-review-reader" for the skill's
             analysis and false-positive filtering, with run_in_background=false.
             Other subagent types are denied. Wait for their complete reports.
-            Use Read, Glob, and Grep for additional repository evidence.
+            Use Read, Glob, and Grep only inside the checkout. Read may also
+            access the specific frozen-diff file above. Host files, .git metadata,
+            and paths or glob patterns escaping the checkout are denied.
             After the skill and all subagents finish, encode the completed Markdown
             findings as strings in the following final JSON envelope.
             Return ONLY a JSON object, without Markdown fences, with:
