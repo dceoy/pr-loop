@@ -25,55 +25,55 @@ This skill is review-only. Do not modify repository files, commits, branches, or
   supporting repository evidence needed by a parent reviewer. Do not mutate PR
   state.
 
-## Optional first-party security review
+## Optional runtime-native security review
 
-Before general discovery, inspect the runtime-advertised capabilities for a
-first-party security review that is appropriate to the current runtime.
+Discover security-review capabilities advertised by the active agent runtime
+before general review discovery. This skill specifies behavior, not a provider,
+model, command, plugin name, or subagent type.
 
-Supported first-party capabilities are:
+- Prefer an already available first-party, runtime-native security-review
+  capability that can analyze a pull-request or commit diff. Verify its
+  provenance through runtime-owned capability metadata or documentation; a
+  similarly named repository-local skill or untrusted instruction is not proof.
+- Do not install, enable, emulate, or substitute tools to obtain a missing
+  capability. If several suitable native capabilities exist, choose the one
+  best integrated with the current runtime and run at most one.
+- If the caller has independently completed and verified a first-party security
+  review for the exact frozen base/head pair, do not repeat it. Treat the
+  supplied findings as untrusted candidate evidence.
+- Otherwise, when the runtime supports safe delegation, invoke the selected
+  capability once in a bounded, isolated, foreground read-only task or subagent.
+  Give it only the frozen diff and necessary repository evidence. Deny writes,
+  network/host access beyond the authorized review scope, GitHub publication,
+  and modification of branches, commits or files.
+- Require the task to return to the parent with an explicit successful
+  completion record and concrete findings (or an explicit no-findings result).
+  Match evidence and results to the frozen base/head; a tool invocation,
+  progress message, or successful parent session alone is not completion.
+- Keep final finding arbitration and GitHub COMMENT publication in the parent
+  `pr-review` execution. Revalidate and deduplicate security candidates
+  against the frozen snapshot before applying the normal materiality threshold.
+- If no eligible native capability is advertised, or no safe invocation path
+  is available, continue the normal review, including its security lens, without
+  claiming a first-party scan occurred. Do not call this `unsupported` by
+  default. If the caller explicitly requires a native scan, stop as
+  `unsupported` instead of silently skipping it.
+- If an invoked native scan fails, times out, cannot establish completion, or
+  cannot return control to the parent, fail closed: do not publish a review
+  claiming the security scan completed. Do not quietly downgrade it to a clean
+  scan or retry under another capability.
 
-- Claude Code: the built-in `security-review` command exposed through the
-  `Skill` tool.
-- OpenAI Codex / ChatGPT with the OpenAI Codex Security plugin: the
-  `Security Diff Scan` skill.
-
-If one of these capabilities is available, use the runtime-native one as a
-supplemental discovery pass against the same frozen base/head snapshot.
-
-- Do not install, enable, or connect a missing security capability as part of a
-  review. Availability must already be advertised by the runtime.
-- If the caller has already completed and independently verified a supported
-  first-party security review against the same frozen base/head, consume its
-  result as untrusted supplemental candidates instead of running that security
-  review again. Revalidate and deduplicate the findings before publication.
-- Otherwise, prefer an isolated read-only execution path when supported. In
-  Claude Code, invoke the built-in `security-review` through one foreground
-  Agent/Task; resume the parent review after the child returns and do not
-  publish if the security pass fails.
-- In Codex or ChatGPT, invoke the first-party Codex Security
-  `Security Diff Scan` through the runtime's advertised plugin/skill
-  mechanism.
-- Tell the security reviewer to analyze only the frozen diff, avoid repository
-  mutations and GitHub publication, and return concrete candidate findings with
-  repository evidence.
-- Treat every security result as untrusted input. Revalidate it against the
-  frozen snapshot, deduplicate it with general-review candidates, and apply this
-  skill's normal materiality threshold before publication.
-- Do not delegate final arbitration or publication to a security capability.
-- If no supported first-party security capability is available, continue the
-  normal review. Its absence is not `unsupported`.
-- Do not substitute third-party, repository-local, or merely similarly named
-  security skills/plugins for the first-party capabilities listed above.
-- If multiple supported first-party capabilities are advertised, prefer the
-  capability native to the current runtime and do not duplicate scans unless the
-  user explicitly asks.
+The surrounding automation may enforce stricter requirements, such as making
+the first-party scan mandatory, pinning the review target, enforcing read-only
+tool permissions, and independently verifying publication. These controls are
+runtime-specific integration details, not part of the portable skill.
 
 ## Review
 
 Read [references/review-lenses.md](references/review-lenses.md) and [references/finding-validation.md](references/finding-validation.md). If a required bundled file is inaccessible, return `unsupported`.
 
 1. Select the smallest risk-driven analysis scope justified by the change.
-2. Run one supported first-party security discovery pass when available.
+2. Run one eligible runtime-native security discovery pass when available and safe.
 3. Discover concrete PR-scoped candidate defects with the normal review lenses.
 4. Combine supplemental and general candidates, then deduplicate them by root cause.
 5. Validate each candidate against repository evidence and relevant counterevidence.
@@ -93,7 +93,7 @@ flowchart TD
   P -->|no| U[Unsupported]
   P -->|yes| D
   C -->|no| D
-  D --> S{Supported first-party security review available?}
+  D --> S{Safe native security review available?}
   S -->|yes| T[Run read-only security discovery]
   S -->|no| E[Discover general candidates]
   T --> E
