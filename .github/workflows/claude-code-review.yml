@@ -128,10 +128,12 @@ jobs:
 
             Follow the skill through its terminal result. It owns discovery,
             validation, deduplication, publication, verification, and
-            first-party security augmentation. In this Claude Code workflow,
-            invoke Claude Code's built-in `security-review` through the
-            `Skill` tool as the security discovery pass; do not silently skip
-            it.
+            first-party security augmentation. Have `pr-review` delegate
+            Claude Code's built-in `security-review` to a foreground
+            Agent/Task whose prompt explicitly names that skill. The delegate
+            must invoke it through `Skill` and return findings to the parent.
+            Never invoke `security-review` as a top-level Skill; resume
+            `pr-review` after the security delegate finishes.
             </procedure>
 
             <completion_criteria>
@@ -202,6 +204,24 @@ jobs:
             any(
               .[];
               .type == "assistant"
+              and (.parent_tool_use_id == null)
+              and any(
+                .message.content[]?;
+                .type == "tool_use"
+                and (.name == "Agent" or .name == "Task")
+                and ((.input.prompt // "") | contains("security-review"))
+              )
+            )
+          ' "${CLAUDE_EXECUTION_FILE}" >/dev/null; then
+            echo "::error::expected a foreground Agent/Task delegated to security-review"
+            exit 1
+          fi
+
+          if jq -e '
+            any(
+              .[];
+              .type == "assistant"
+              and (.parent_tool_use_id == null)
               and any(
                 .message.content[]?;
                 .type == "tool_use"
@@ -210,7 +230,7 @@ jobs:
               )
             )
           ' "${CLAUDE_EXECUTION_FILE}" >/dev/null; then
-            echo "::error::expected Claude Code security-review Skill invocation"
+            echo "::error::security-review must run inside a delegate, not at the top level"
             exit 1
           fi
       - name: Verify published PR review
