@@ -14,7 +14,7 @@ def verification_query():
     content = WORKFLOW.read_text()
     step = content.split("      - name: Verify completed first-party security review", 1)[1]
     step = step.split("      - name: Run comprehensive PR review", 1)[0]
-    return step.split("          if ! jq -e '\n", 1)[1].split(
+    return step.split("--arg head \"${PR_HEAD_SHA}\" '\n", 1)[1].split(
         '\n          \' "${SECURITY_EXECUTION_FILE}"', 1
     )[0]
 
@@ -41,7 +41,8 @@ class SecurityReviewVerificationTest(unittest.TestCase):
         }
         terminal = {
             "type": "result", "subtype": "success", "is_error": False,
-            "result": "Security Review: no findings",
+            "result": json.dumps({"status": "completed", "base_sha": "base",
+                                  "head_sha": "head", "findings": []}),
         }
 
         def modified(value, **changes):
@@ -59,7 +60,25 @@ class SecurityReviewVerificationTest(unittest.TestCase):
             output["message"]["content"][0].update(changes)
             return output
 
+        def completion(**changes):
+            value = json.loads(terminal["result"])
+            value.update(changes)
+            return modified(terminal, result=json.dumps(value))
+
         cases = {
+            "completed_with_findings": (
+                [call, result, completion(findings=["Concrete security finding"])], True
+            ),
+            "loaded_skill_but_failed_analysis": (
+                [call, result, modified(terminal, result="Could not complete the security scan because the diff was unavailable")], False
+            ),
+            "explicit_failed_scan": ([call, result, completion(status="failed")], False),
+            "wrong_base": ([call, result, completion(base_sha="other")], False),
+            "wrong_head": ([call, result, completion(head_sha="other")], False),
+            "missing_findings": ([call, result, completion(findings=None)], False),
+            "non_array_findings": ([call, result, completion(findings="none")], False),
+            "empty_finding": ([call, result, completion(findings=[" "])], False),
+            "non_string_finding": ([call, result, completion(findings=[{}])], False),
             "completed_scan": ([call, result, terminal], True),
             "tool_error_with_successful_session": (
                 [call, modify_result(is_error=True), terminal], False
@@ -91,11 +110,11 @@ class SecurityReviewVerificationTest(unittest.TestCase):
         for name, (transcript, accepted) in cases.items():
             with self.subTest(case=name):
                 proc = subprocess.run(
-                    ["jq", "-e", query],
+                    ["jq", "-e", "--arg", "base", "base", "--arg", "head", "head", query],
                     input=json.dumps(transcript), text=True, capture_output=True,
                     check=False,
                 )
-                self.assertIn(proc.returncode, (0, 1), proc.stderr)
+                self.assertIn(proc.returncode, (0, 1, 5), proc.stderr)
                 self.assertEqual(proc.returncode == 0, accepted, proc.stderr)
 
 

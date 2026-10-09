@@ -104,6 +104,13 @@ jobs:
                  .id' \
             | sort -u > "${baseline}"
           printf 'path=%s\n' "${baseline}" >> "${GITHUB_OUTPUT}"
+      - name: Prepare frozen security diff
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git diff --no-ext-diff --no-textconv "${PR_BASE_SHA}" "${PR_HEAD_SHA}" \
+            > "${RUNNER_TEMP}/security-review.diff"
       - name: Run first-party security review
         id: claude-security
         uses: anthropics/claude-code-action@ed670b4cf9de2a5a570d130d2f6197b9e543cd64  # v1.0.240
@@ -120,17 +127,28 @@ jobs:
             base ${{ github.event.pull_request.base.sha }},
             head ${{ github.event.pull_request.head.sha }}.
             Analyze security risks only. Do not edit files or publish to GitHub.
-            Return full findings or an explicit no-findings result.
+            Read the frozen diff at ${{ runner.temp }}/security-review.diff.
+            Use Read, Glob, and Grep for any additional repository evidence.
+            Return ONLY a JSON object, without Markdown fences, with:
+            status: "completed" only if the full scan finished, otherwise "failed";
+            base_sha and head_sha: the exact requested SHAs;
+            findings: an array of nonempty strings describing full findings,
+            or [] for an explicitly completed scan with no findings.
+            Never report completed when the diff or required evidence is unavailable.
           claude_args: >-
-            --allowedTools="Skill,Read,Glob,Grep,Bash(git:*)"
+            --tools="Skill,Read,Glob,Grep"
+            --allowedTools="Skill,Read,Glob,Grep"
+            --disallowedTools="Bash,Edit,Write,NotebookEdit,Agent,Task"
             --model=opusplan
             --advisor=opus
             --effort=high
-            --permission-mode=auto
+            --permission-mode=dontAsk
       - name: Verify completed first-party security review
         id: verify-security
         env:
           SECURITY_EXECUTION_FILE: ${{ steps.claude-security.outputs.execution_file }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           if [[ -z "${SECURITY_EXECUTION_FILE}" || ! -f "${SECURITY_EXECUTION_FILE}" ]]; then
             echo "::error::security-review execution transcript is unavailable"
@@ -138,7 +156,7 @@ jobs:
           fi
           # Match the Skill call to its successful tool result, not just the
           # Claude session's terminal status (which can be success after a tool error).
-          if ! jq -e '
+          if ! jq -e --arg base "${PR_BASE_SHA}" --arg head "${PR_HEAD_SHA}" '
             . as $log
             | [
                 range(0; $log | length) as $i
@@ -167,14 +185,22 @@ jobs:
                 and (
                   $log | [.[] | select(.type == "result")] | last
                   | .subtype == "success" and .is_error == false
-                    and (.result | type == "string" and length > 0)
+                    and (
+                      .result | fromjson
+                      | .status == "completed"
+                        and .base_sha == $base and .head_sha == $head
+                        and (.findings | type == "array")
+                        and all(.findings[]; type == "string" and test("\\S"))
+                    )
                 )
               end
           ' "${SECURITY_EXECUTION_FILE}" >/dev/null; then
             echo "::error::security-review Skill result or successful terminal result missing"
             exit 1
           fi
-          jq -r '[.[] | select(.type == "result")] | last | .result' \
+          jq -r '[.[] | select(.type == "result")] | last | .result | fromjson
+            | if .findings == [] then "Security Review: no findings"
+              else .findings | join("\n\n") end' \
             "${SECURITY_EXECUTION_FILE}" > "${RUNNER_TEMP}/security-review-findings.md"
       - name: Run comprehensive PR review
         id: claude-review
