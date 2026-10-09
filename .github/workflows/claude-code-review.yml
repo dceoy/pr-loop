@@ -132,6 +132,10 @@ jobs:
             Claude Code's built-in `security-review` to a foreground
             Agent/Task whose prompt explicitly names that skill. The delegate
             must invoke it through `Skill` and return findings to the parent.
+            Run the Agent/Task with `run_in_background: false` and await its
+            successful result, including the nested `Skill` tool result,
+            before publishing. If security invocation or completion cannot be
+            verified, stop rather than publishing an unchecked review.
             Never invoke `security-review` as a top-level Skill; resume
             `pr-review` after the security delegate finishes.
             </procedure>
@@ -200,20 +204,45 @@ jobs:
             exit 1
           fi
 
+          # Correlate foreground Agent, nested Skill and both completed tool results.
           if ! jq -e '
-            any(
-              .[];
-              .type == "assistant"
-              and (.parent_tool_use_id == null)
-              and any(
-                .message.content[]?;
-                .type == "tool_use"
-                and (.name == "Agent" or .name == "Task")
-                and ((.input.prompt // "") | contains("security-review"))
-              )
-            )
+            . as $log
+            | [
+                range(0; $log | length) as $start
+                | $log[$start]
+                | select(.type == "assistant" and .parent_tool_use_id == null)
+                | .message.content[]?
+                | select(.type == "tool_use" and (.name == "Agent" or .name == "Task"))
+                | select(.input.run_in_background == false)
+                | select((.input.prompt // "") | contains("security-review"))
+                | .id as $agent_id
+                | [
+                    range($start + 1; $log | length) as $skill_index
+                    | $log[$skill_index]
+                    | select(.type == "assistant" and .parent_tool_use_id == $agent_id)
+                    | .message.content[]?
+                    | select(.type == "tool_use" and .name == "Skill")
+                    | select((.input.skill // .input.name // "") == "security-review")
+                    | .id as $skill_id
+                    | [
+                        range($skill_index + 1; $log | length) as $skill_result_index
+                        | $log[$skill_result_index]
+                        | select(.type == "user" and .parent_tool_use_id == $agent_id)
+                        | .message.content[]?
+                        | select(.type == "tool_result" and .tool_use_id == $skill_id and (.is_error != true))
+                        | [
+                            range($skill_result_index + 1; $log | length) as $agent_result_index
+                            | $log[$agent_result_index]
+                            | select(.type == "user" and .parent_tool_use_id == null)
+                            | .message.content[]?
+                            | select(.type == "tool_result" and .tool_use_id == $agent_id and (.is_error != true))
+                            | true
+                          ] | any
+                      ] | any
+                  ] | any
+              ] | any
           ' "${CLAUDE_EXECUTION_FILE}" >/dev/null; then
-            echo "::error::expected a foreground Agent/Task delegated to security-review"
+            echo "::error::expected completed foreground security-review Skill and Agent results"
             exit 1
           fi
 
