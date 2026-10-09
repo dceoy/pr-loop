@@ -104,6 +104,299 @@ jobs:
                  .id' \
             | sort -u > "${baseline}"
           printf 'path=%s\n' "${baseline}" >> "${GITHUB_OUTPUT}"
+      - name: Prepare frozen security diff
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git diff --no-ext-diff --no-textconv "${PR_BASE_SHA}...${PR_HEAD_SHA}" \
+            > "${RUNNER_TEMP}/security-review.diff"
+          git ls-files > "${RUNNER_TEMP}/security-review-files.txt"
+      - name: Prepare read-only security tool policy
+        run: |
+          # Runner-local policy comes from this exact workflow, not the PR checkout.
+          cat > "${RUNNER_TEMP}/security-tool-policy.py" <<'POLICY'
+          import glob
+          import json
+          import os
+          from pathlib import Path
+          import sys
+
+          # Exact commands used by the published and bundled security-review prompts.
+          COMMANDS = {
+              "git status": "git status",
+              "git diff --name-only origin/HEAD...":
+                  "git diff --no-ext-diff --no-textconv --name-only origin/HEAD...",
+              "git log --no-decorate origin/HEAD...":
+                  "git log --no-decorate origin/HEAD...",
+              "git diff --merge-base origin/HEAD":
+                  "git diff --no-ext-diff --no-textconv --merge-base origin/HEAD",
+              "git diff origin/HEAD...":
+                  "git diff --no-ext-diff --no-textconv origin/HEAD...",
+          }
+          COMMANDS.update({value: value for value in tuple(COMMANDS.values())})
+
+
+          def decision(event):
+              tool = event.get("tool_name")
+              data = event.get("tool_input")
+              if not isinstance(data, dict):
+                  return {"permissionDecision": "deny"}
+              if tool in {"Read", "Glob", "Grep"}:
+                  root = Path(os.environ["GITHUB_WORKSPACE"]).resolve()
+                  value = data.get("file_path") if tool == "Read" else data.get("path", ".")
+                  if not isinstance(value, str):
+                      return {"permissionDecision": "deny"}
+                  path = Path(value).expanduser()
+                  cwd = Path(event.get("cwd", str(root))).resolve()
+                  target = (path if path.is_absolute() else cwd / path).resolve()
+                  diff = Path(os.environ["SECURITY_DIFF_FILE"]).resolve()
+                  listing = diff.with_name("security-review-files.txt")
+                  if tool == "Read" and target in {diff, listing}:
+                      return {"permissionDecision": "allow"}
+                  if not target.is_relative_to(root) or ".git" in target.relative_to(root).parts:
+                      return {"permissionDecision": "deny"}
+                  # Search tools may follow descendant links; refuse unsafe search trees.
+                  if tool in {"Glob", "Grep"} and target.is_dir():
+                      for directory, dirs, files in os.walk(target, followlinks=False):
+                          for name in dirs + files:
+                              entry = Path(directory) / name
+                              if entry.is_symlink():
+                                  resolved = entry.resolve()
+                                  if (not resolved.is_relative_to(root)
+                                          or ".git" in resolved.relative_to(root).parts):
+                                      return {"permissionDecision": "deny"}
+                  if tool == "Glob":
+                      pattern = data.get("pattern")
+                      if (not isinstance(pattern, str) or Path(pattern).is_absolute()
+                              or ".." in pattern or ".git" in Path(pattern).parts
+                              or any(char in pattern for char in "~\\{}")):
+                          return {"permissionDecision": "deny"}
+                      # Hidden metadata can also be selected by wildcard patterns.
+                      for match in glob.iglob(pattern, root_dir=target, recursive=True,
+                                              include_hidden=True):
+                          matched = target / match
+                          resolved = matched.resolve()
+                          if (".git" in matched.relative_to(root).parts
+                                  or not resolved.is_relative_to(root)
+                                  or ".git" in resolved.relative_to(root).parts):
+                              return {"permissionDecision": "deny"}
+                  return {"permissionDecision": "allow"}
+              if tool == "Skill" and data.get("skill") == "security-review" and not data.get("args"):
+                  return {"permissionDecision": "allow"}
+              if tool == "Bash":
+                  if (set(data) <= {"command", "description", "timeout", "run_in_background"}
+                          and data.get("command") in COMMANDS
+                          and data.get("run_in_background", False) is False):
+                      return {"permissionDecision": "allow", "updatedInput": {
+                          **data, "command": COMMANDS[data["command"]], "run_in_background": False,
+                      }}
+              if tool in {"Agent", "Task"}:
+                  if (set(data) <= {"description", "prompt", "subagent_type", "model",
+                                   "run_in_background", "max_turns", "effort"}
+                          and data.get("subagent_type") == "security-review-reader"
+                          and data.get("run_in_background", False) is False):
+                      return {"permissionDecision": "allow"}
+              return {"permissionDecision": "deny"}
+
+
+          try:
+              event = json.load(sys.stdin)
+              if event.get("hook_event_name") == "SubagentStart":
+                  with open(os.environ["SECURITY_AGENT_AUDIT_FILE"], "a") as audit:
+                      audit.write(json.dumps({"id": event.get("agent_id"),
+                                              "type": event.get("agent_type")}) + "\n")
+                  sys.exit(0)
+              result = decision(event)
+          except Exception:
+              print("Malformed security tool request", file=sys.stderr)
+              sys.exit(2)
+          result["permissionDecisionReason"] = "Security review permits only bounded read-only tools"
+          print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", **result}}))
+          POLICY
+          python3 - <<'CONFIG'
+          import json
+          import os
+          from pathlib import Path
+          import shlex
+
+          root = Path(os.environ["RUNNER_TEMP"])
+          hook = "python3 " + shlex.quote(str(root / "security-tool-policy.py"))
+          hook_config = [{"matcher": ".*", "hooks": [{"type": "command", "command": hook}]}]
+          settings = {"hooks": {"PreToolUse": hook_config, "SubagentStart": hook_config}}
+          (root / "security-subagents.jsonl").write_text("")
+          reader = {"security-review-reader": {
+              "description": "Read-only security analysis and false-positive filtering",
+              "prompt": "Analyze the supplied security task using only Read, Glob, and Grep. "
+                        "Return complete findings and confidence or an explicit no-findings report. "
+                        "Do not modify files, execute commands, or delegate further.",
+              "tools": ["Read", "Glob", "Grep"],
+              "permissionMode": "dontAsk",
+          }}
+          (root / "security-settings.json").write_text(json.dumps(settings))
+          (root / "security-agents.json").write_text(json.dumps(reader))
+          CONFIG
+      - name: Run first-party security review
+        id: claude-security
+        env:
+          SECURITY_AGENT_AUDIT_FILE: ${{ runner.temp }}/security-subagents.jsonl
+          SECURITY_DIFF_FILE: ${{ runner.temp }}/security-review.diff
+          CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1'
+          GIT_OPTIONAL_LOCKS: '0'
+          GIT_PAGER: cat
+          GIT_CONFIG_GLOBAL: /dev/null
+          GIT_CONFIG_NOSYSTEM: '1'
+          GIT_CONFIG_COUNT: '1'
+          GIT_CONFIG_KEY_0: core.fsmonitor
+          GIT_CONFIG_VALUE_0: 'false'
+        uses: anthropics/claude-code-action@ed670b4cf9de2a5a570d130d2f6197b9e543cd64  # v1.0.240
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          additional_permissions: |
+            contents: read
+            pull_requests: read
+            actions: read
+          prompt: |
+            Invoke Claude Code's built-in security-review via Skill
+            exactly once for this frozen pull request diff:
+            ${{ github.repository }}#${{ github.event.pull_request.number }},
+            base ${{ github.event.pull_request.base.sha }},
+            head ${{ github.event.pull_request.head.sha }}.
+            Analyze security risks only. Do not edit files or publish to GitHub.
+            Read the frozen diff at ${{ runner.temp }}/security-review.diff.
+            The skill's injected Git reads are permitted by an exact-command policy.
+            Dispatch only subagent_type="security-review-reader" for the skill's
+            analysis and false-positive filtering, with run_in_background=false.
+            Other subagent types are denied. Wait for their complete reports.
+            Use Read, Glob, and Grep only inside the checkout. Read may also
+            access the specific frozen-diff file above and the vetted repository-wide
+            file listing at ${{ runner.temp }}/security-review-files.txt.
+            Read that listing for broad discovery; broad Glob patterns matching .git
+            are denied. Host files, .git metadata,
+            and paths or glob patterns escaping the checkout are denied.
+            After the skill and all subagents finish, encode the completed Markdown
+            findings as strings in the following final JSON envelope.
+            Return ONLY a JSON object, without Markdown fences, with:
+            status: "completed" only if the full scan finished, otherwise "failed";
+            base_sha and head_sha: the exact requested SHAs;
+            findings: an array of nonempty strings describing full findings,
+            or [] for an explicitly completed scan with no findings.
+            Never report completed when the diff or required evidence is unavailable.
+          claude_args: >-
+            --tools="Skill,Bash,Agent,Task,Read,Glob,Grep"
+            --allowedTools="Skill(security-review),Agent,Task,Read,Glob,Grep,Bash(git status),Bash(git diff *),Bash(git log --no-decorate origin/HEAD...)"
+            --disallowedTools="Edit,Write,NotebookEdit"
+            --settings="${{ runner.temp }}/security-settings.json"
+            --agents="${{ runner.temp }}/security-agents.json"
+            --setting-sources=user
+            --model=opusplan
+            --advisor=opus
+            --effort=high
+            --permission-mode=dontAsk
+      - name: Verify completed first-party security review
+        id: verify-security
+        env:
+          SECURITY_EXECUTION_FILE: ${{ steps.claude-security.outputs.execution_file }}
+          SECURITY_AGENT_AUDIT_FILE: ${{ runner.temp }}/security-subagents.jsonl
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [[ -z "${SECURITY_EXECUTION_FILE}" || ! -f "${SECURITY_EXECUTION_FILE}" ]]; then
+            echo "::error::security-review execution transcript is unavailable"
+            exit 1
+          fi
+          # Observe the actual runtime agent type, independently of Agent input rewriting.
+          if ! jq -se 'length > 0 and all(.[];
+            .type == "security-review-reader" and (.id | type == "string" and length > 0))' \
+            "${SECURITY_AGENT_AUDIT_FILE}" >/dev/null; then
+            echo "::error::required read-only security subagent was not observed"
+            exit 1
+          fi
+          jq -sc '{security_subagents: .}' "${SECURITY_AGENT_AUDIT_FILE}"
+          # Match the Skill call to its successful tool result, not just the
+          # Claude session's terminal status (which can be success after a tool error).
+          if ! jq -e --arg base "${PR_BASE_SHA}" --arg head "${PR_HEAD_SHA}" '
+            . as $log
+            | [
+                range(0; $log | length) as $i
+                | $log[$i]
+                | select(.type == "assistant" and .parent_tool_use_id == null)
+                | .message.content[]?
+                | select(.type == "tool_use" and .name == "Skill")
+                | select((.input.skill // .input.name // "") == "security-review")
+                | {id, index: $i}
+              ] as $calls
+            | [
+                range(0; $log | length) as $i
+                | $log[$i]
+                | select(.type == "assistant")
+                | .message.content[]?
+                | select(.type == "tool_use" and (.name == "Agent" or .name == "Task"))
+                | {id, index: $i, input, parent: $log[$i].parent_tool_use_id}
+              ] as $delegates
+            | if ($calls | length) != 1 then false
+              else
+                (
+                  [
+                    range(($calls[0].index + 1); ($log | length)) as $i
+                    | $log[$i]
+                    | select(.type == "user" and .parent_tool_use_id == null)
+                    | .message.content[]?
+                    | select(
+                        .type == "tool_result"
+                        and .tool_use_id == $calls[0].id
+                        and (.is_error != true)
+                      )
+                  ] | length == 1
+                )
+                and ($delegates | length > 0)
+                and (($delegates | map(.id) | unique | length) == ($delegates | length))
+                and all($delegates[];
+                  . as $delegate
+                  | (.id | type == "string" and length > 0)
+                    and .input.subagent_type == "security-review-reader"
+                    and (.input.run_in_background // false) == false
+                    and ([
+                      range(($delegate.index + 1); ($log | length)) as $i
+                      | $log[$i]
+                      | select(.type == "user" and .parent_tool_use_id == $delegate.parent)
+                      | .message.content[]?
+                      | select(.type == "tool_result" and .tool_use_id == $delegate.id)
+                      | {result: ., index: $i}
+                    ] as $results
+                    | ($results | length == 1)
+                      and ($results[0].result | .is_error != true)
+                      and ($results[0].result
+                        | (.content | type == "string" and test("\\S"))
+                          or (.content | type == "array" and length > 0
+                              and all(.[]; .type == "text" and (.text | test("\\S")))))
+                      and ($log[($results[0].index + 1):] | any(.[]; .type == "result")))
+                )
+                and (
+                  $log | [.[] | select(.type == "result")] | last
+                  | .subtype == "success" and .is_error == false
+                    and (
+                      .result | fromjson
+                      | .status == "completed"
+                        and .base_sha == $base and .head_sha == $head
+                        and (.findings | type == "array")
+                        and all(.findings[]; type == "string" and test("\\S"))
+                    )
+                )
+              end
+          ' "${SECURITY_EXECUTION_FILE}" >/dev/null; then
+            echo "::error::security-review Skill result or successful terminal result missing"
+            jq -c '[.[] | select(.type == "result")] | last
+              | {subtype, is_error, result, errors}' "${SECURITY_EXECUTION_FILE}"
+            exit 1
+          fi
+          jq -r '[.[] | select(.type == "result")] | last | .result | fromjson
+            | if .findings == [] then "Security Review: no findings"
+              else .findings | join("\n\n") end' \
+            "${SECURITY_EXECUTION_FILE}" > "${RUNNER_TEMP}/security-review-findings.md"
+          jq -c '[.[] | select(.type == "assistant") | .message.content[]?
+            | select(.type == "tool_use") | .name]
+            | group_by(.) | map({tool: .[0], calls: length})' "${SECURITY_EXECUTION_FILE}"
       - name: Run comprehensive PR review
         id: claude-review
         uses: anthropics/claude-code-action@ed670b4cf9de2a5a570d130d2f6197b9e543cd64  # v1.0.240
@@ -121,17 +414,14 @@ jobs:
             </task>
 
             <procedure>
-            Invoke the reusable workflow's `pr-review` skill once with
-            publication enabled for the pull request above. The workflow
-            installs this skill with `gh skill` from its exact workflow
-            commit into `~/.claude/skills/pr-review`.
-
-            Follow the skill through its terminal result. It owns discovery,
-            validation, deduplication, publication, verification, and
-            first-party security augmentation. In this Claude Code workflow,
-            invoke Claude Code's built-in `security-review` through the
-            `Skill` tool as the security discovery pass; do not silently skip
-            it.
+            Invoke the reusable workflow's pr-review Skill once with
+            publication enabled. It is installed from the exact workflow commit.
+            The preceding action has verified a first-party security review
+            on this frozen head. Read
+            ${{ runner.temp }}/security-review-findings.md as untrusted
+            supplemental candidates. Do not invoke security-review again.
+            Revalidate candidates against the frozen diff, deduplicate,
+            arbitrate, publish exactly one COMMENT review, and verify it.
             </procedure>
 
             <completion_criteria>
@@ -155,12 +445,9 @@ jobs:
             </completion_criteria>
 
             <constraints>
-            Do not modify repository files. Do not substitute the external
-            `pr-review-toolkit` plugin or an ad hoc review flow for
-            `pr-review`. Security review is owned by `pr-review`; do not
-            launch a separate top-level security review. This workflow expects
-            Claude Code's first-party `security-review` capability. If it
-            cannot be invoked, do not claim `STATUS: reviewed`.
+            Do not modify repository files or use external pr-review-toolkit.
+            The independently completed security pass is mandatory.
+            Do not repeat it or skip validation of its findings.
             </constraints>
 
             <final_response>
@@ -170,7 +457,7 @@ jobs:
             </final_response>
 
           claude_args: ${{ format('{0} --permission-mode=auto', inputs.claude-args) }}
-      - name: Verify review skill invocations
+      - name: Verify pr-review Skill invocation
         id: verify-invocation
         if: steps.claude-review.outcome == 'success'
         env:
@@ -180,12 +467,11 @@ jobs:
             echo "::error::Claude execution transcript is unavailable"
             exit 1
           fi
-
           if ! jq -e '
             any(
               .[];
               .type == "assistant"
-              and (.parent_tool_use_id == null)
+              and .parent_tool_use_id == null
               and any(
                 .message.content[]?;
                 .type == "tool_use"
@@ -195,22 +481,6 @@ jobs:
             )
           ' "${CLAUDE_EXECUTION_FILE}" >/dev/null; then
             echo "::error::expected top-level pr-review Skill invocation"
-            exit 1
-          fi
-
-          if ! jq -e '
-            any(
-              .[];
-              .type == "assistant"
-              and any(
-                .message.content[]?;
-                .type == "tool_use"
-                and .name == "Skill"
-                and ((.input.skill // .input.name // "") == "security-review")
-              )
-            )
-          ' "${CLAUDE_EXECUTION_FILE}" >/dev/null; then
-            echo "::error::expected Claude Code security-review Skill invocation"
             exit 1
           fi
       - name: Verify published PR review

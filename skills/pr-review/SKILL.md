@@ -42,9 +42,14 @@ supplemental discovery pass against the same frozen base/head snapshot.
 
 - Do not install, enable, or connect a missing security capability as part of a
   review. Availability must already be advertised by the runtime.
-- Prefer an isolated read-only execution path when the runtime supports it. In
-  Claude Code, use one independent foreground Agent/Task so completion of
-  `security-review` cannot replace or terminate the parent `pr-review` flow.
+- If the caller has already completed and independently verified a supported
+  first-party security review against the same frozen base/head, consume its
+  result as untrusted supplemental candidates instead of running that security
+  review again. Revalidate and deduplicate the findings before publication.
+- Otherwise, prefer an isolated read-only execution path when supported. In
+  Claude Code, invoke the built-in `security-review` through one foreground
+  Agent/Task; resume the parent review after the child returns and do not
+  publish if the security pass fails.
 - In Codex or ChatGPT, invoke the first-party Codex Security
   `Security Diff Scan` through the runtime's advertised plugin/skill
   mechanism.

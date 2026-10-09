@@ -7,7 +7,7 @@
 - [`issue-to-pr`](skills/issue-to-pr/SKILL.md): implement same-repository Issues and stop after creating and verifying the PR.
 - [`pr-review`](skills/pr-review/SKILL.md): review one frozen PR head with adaptive risk-driven analysis and verified `COMMENT` publication.
 - [`pr-feedback-triage`](skills/pr-feedback-triage/SKILL.md): reconcile feedback against the latest live head, apply focused fixes, and finish replies/resolutions.
-- [`pr-loop`](skills/pr-loop/SKILL.md): compose those phases until the stable final head is reviewed, triaged, and unblocked.
+- [`pr-loop`](skills/pr-loop/SKILL.md): compose those phases until the stable final head is reviewed and published feedback is reconciled.
 
 Each standalone skill owns its own mechanics and result contract. The composite skill reuses those procedures without duplicating their policies.
 
@@ -20,8 +20,9 @@ flowchart LR
   R --> F[pr-feedback-triage<br/>latest live state]
   F --> D{Post-triage state?}
   D -->|head changed| R
-  D -->|stable + blocked| X[Stopped]
-  D -->|stable + unblocked| S[Success]
+  D -->|feedback changed| F
+  D -->|stable + feedback blocker| X[Stopped]
+  D -->|stable + reconciled| S[Success]
   P -->|cannot complete| X
 ```
 
@@ -34,7 +35,9 @@ For an existing pull request, `pr-loop` starts at `pr-review`.
 - Frozen-head review: `pr-review` analyzes one immutable snapshot and, when composed, publishes explicitly against that reviewed SHA.
 - Live-head triage: `pr-feedback-triage` follows current head/feedback changes and rejects stale prepared actions before mutation.
 - Final-head review: if triage changes the head, `pr-loop` starts another review round before success.
-- Fail closed: unsafe repository state, unresolved QA/publication failures, stale state, exhausted caller limits, missing mandatory capabilities, or reviewer/merge blockers stop the relevant procedure.
+- Fail closed: unsafe repository state, unresolved required QA/publication failures, stale state, exhausted caller limits, missing mandatory capabilities, unresolved actionable feedback, or active `CHANGES_REQUESTED` reviews stop the relevant procedure.
+- No third-party wait: triage published bot/human feedback, but never await pending or running third-party reviews or future comments.
+- Completion is not merge readiness: CI failures, branch protection, and deployment/acceptance checks are reported separately; no protections are bypassed and no merge is implied.
 
 ## Requirements
 
@@ -67,8 +70,10 @@ Codex Security plugin is available in Codex/ChatGPT. Security results are
 read-only supplemental candidates that `pr-review` revalidates and deduplicates
 before publishing exactly one verified COMMENT review.
 
-The bundled Claude Code workflow expects its built-in `security-review` to run
-and verifies the nested Skill invocation from the execution transcript. In
+The bundled Claude Code workflow first runs and verifies `security-review`
+in a separate Claude Code Action. It passes the completed result to `pr-review`
+for validation and one verified COMMENT publication. This prevents a security
+review's terminal response from ending the parent review prematurely. In
 other runtimes, if no supported first-party security capability is advertised,
 the normal `pr-review` analysis continues without security augmentation.
 
