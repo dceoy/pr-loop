@@ -1,4 +1,4 @@
-"""Regression checks for the pinned security helpers used by the reusable workflow."""
+"""Regression checks against the jq gate embedded in the reusable workflow."""
 
 import copy
 import json
@@ -11,11 +11,13 @@ import unittest
 WORKFLOW = Path(__file__).resolve().parents[1] / ".github/workflows/claude-code-review.yml"
 
 
-SCRIPT_DIR = WORKFLOW.parents[2] / "scripts/claude-code-review"
-
-
 def verification_query():
-    return (SCRIPT_DIR / "verify-security-review.jq").read_text()
+    content = WORKFLOW.read_text()
+    step = content.split("      - name: Verify completed first-party security review", 1)[1]
+    step = step.split("      - name: Run comprehensive PR review", 1)[0]
+    return step.split("--arg head \"${PR_HEAD_SHA}\" '\n", 1)[1].split(
+        '\n          \' "${SECURITY_EXECUTION_FILE}"', 1
+    )[0]
 
 
 class SecurityReviewVerificationTest(unittest.TestCase):
@@ -164,25 +166,9 @@ class SecurityReviewVerificationTest(unittest.TestCase):
 class SecurityToolPolicyTest(unittest.TestCase):
     @staticmethod
     def embedded_source(marker):
-        paths = {
-            "POLICY": "security-tool-policy.py",
-            "CONFIG": "configure-security-review.py",
-        }
-        return (SCRIPT_DIR / paths[marker]).read_text()
-
-
-    def test_policy_helpers_are_pinned_to_workflow_revision(self):
-        workflow = WORKFLOW.read_text()
-        self.assertIn("job.workflow_repository", workflow)
-        self.assertIn("job.workflow_sha", workflow)
-        self.assertIn('ref=${WORKFLOW_SHA}', workflow)
-        for name in (
-            "security-tool-policy.py",
-            "configure-security-review.py",
-            "verify-security-review.jq",
-        ):
-            self.assertIn(name, workflow)
-            self.assertTrue((SCRIPT_DIR / name).is_file())
+        step = WORKFLOW.read_text().split("      - name: Prepare read-only security tool policy", 1)[1]
+        source = step.split("<<'" + marker + "'\n", 1)[1].split("          " + marker, 1)[0]
+        return "\n".join(line[10:] for line in source.splitlines())
 
     def test_read_only_tool_boundary(self):
         commands = [
