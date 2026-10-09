@@ -107,6 +107,50 @@ class SecurityReviewVerificationTest(unittest.TestCase):
                 [call, modify_result(is_error=None), terminal], True
             ),
         }
+        delegate = {
+            "type": "assistant", "parent_tool_use_id": None,
+            "message": {"content": [{"type": "tool_use", "name": "Agent", "id": "agent_1",
+                "input": {"subagent_type": "security-review-reader", "run_in_background": False}}]},
+        }
+        report = {
+            "type": "user", "parent_tool_use_id": None,
+            "message": {"content": [{"type": "tool_result", "tool_use_id": "agent_1",
+                "is_error": False, "content": "Completed analysis: no findings"}]},
+        }
+        cases = {name: (transcript[:-1] + [delegate, report] + transcript[-1:], accepted)
+                 for name, (transcript, accepted) in cases.items()}
+        def delegate_input(**changes):
+            output = copy.deepcopy(delegate)
+            output["message"]["content"][0]["input"].update(changes)
+            return output
+
+        def delegate_report(**changes):
+            output = copy.deepcopy(report)
+            output["message"]["content"][0].update(changes)
+            return output
+
+        cases.update({
+            "missing_delegate": ([call, result, terminal], False),
+            "failed_delegate_successful_session": ([call, result, delegate, delegate_report(is_error=True), terminal], False),
+            "unfinished_delegate": ([call, result, delegate, terminal], False),
+            "background_delegate": ([call, result, delegate_input(run_in_background=True), report, terminal], False),
+            "wrong_delegate_type": ([call, result, delegate_input(subagent_type="Explore"), report, terminal], False),
+            "empty_delegate_report": ([call, result, delegate, delegate_report(content=""), terminal], False),
+            "report_before_dispatch": ([call, result, report, delegate, terminal], False),
+            "report_after_terminal": ([call, result, delegate, terminal, report], False),
+            "wrong_delegate_result_id": ([call, result, delegate, delegate_report(tool_use_id="other"), terminal], False),
+            "wrong_result_parent": ([call, result, delegate, modified(report, parent_tool_use_id="other"), terminal], False),
+            "mixed_failed_and_successful_results": ([call, result, delegate, delegate_report(is_error=True), report, terminal], False),
+            "duplicate_delegate_result": ([call, result, delegate, report, report, terminal], False),
+            "structured_delegate_report": ([call, result, delegate, delegate_report(content=[{"type": "text", "text": "Completed: no findings"}]), terminal], True),
+        })
+        second_delegate = copy.deepcopy(delegate)
+        second_delegate["message"]["content"][0].update(id="agent_2", name="Task")
+        second_report = delegate_report(tool_use_id="agent_2")
+        cases.update({
+            "multiple_completed_delegates": ([call, result, delegate, report, second_delegate, second_report, terminal], True),
+            "second_delegate_failed": ([call, result, delegate, report, second_delegate, delegate_report(tool_use_id="agent_2", is_error=True), terminal], False),
+        })
         query = verification_query()
         for name, (transcript, accepted) in cases.items():
             with self.subTest(case=name):
@@ -216,6 +260,7 @@ class SecurityToolPolicyTest(unittest.TestCase):
             cases = [
                 ("repository_file", "Read", {"file_path": "source.py"}, True),
                 ("frozen_diff", "Read", {"file_path": str(diff)}, True),
+                ("broad_source_discovery", "Read", {"file_path": str(diff.with_name("security-review-files.txt"))}, True),
                 ("absolute_host_file", "Read", {"file_path": str(secret)}, False),
                 ("relative_traversal", "Read", {"file_path": "../host-credential"}, False),
                 ("symlink_escape", "Read", {"file_path": "escape"}, False),
@@ -308,6 +353,10 @@ class SecurityToolPolicyTest(unittest.TestCase):
             diff = (root / "security-review.diff").read_text()
             self.assertIn("pr-only.txt", diff)
             self.assertNotIn("base-only.txt", diff)
+            listing = (root / "security-review-files.txt").read_text().splitlines()
+            self.assertIn("pr-only.txt", listing)
+            self.assertNotIn("base-only.txt", listing)
+            self.assertTrue(all(".git" not in Path(name).parts for name in listing))
 
     def test_generated_reader_has_only_read_tools(self):
         import os

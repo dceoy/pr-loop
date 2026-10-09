@@ -111,6 +111,7 @@ jobs:
         run: |
           git diff --no-ext-diff --no-textconv "${PR_BASE_SHA}...${PR_HEAD_SHA}" \
             > "${RUNNER_TEMP}/security-review.diff"
+          git ls-files > "${RUNNER_TEMP}/security-review-files.txt"
       - name: Prepare read-only security tool policy
         run: |
           # Runner-local policy comes from this exact workflow, not the PR checkout.
@@ -150,7 +151,8 @@ jobs:
                   cwd = Path(event.get("cwd", str(root))).resolve()
                   target = (path if path.is_absolute() else cwd / path).resolve()
                   diff = Path(os.environ["SECURITY_DIFF_FILE"]).resolve()
-                  if tool == "Read" and target == diff:
+                  listing = diff.with_name("security-review-files.txt")
+                  if tool == "Read" and target in {diff, listing}:
                       return {"permissionDecision": "allow"}
                   if not target.is_relative_to(root) or ".git" in target.relative_to(root).parts:
                       return {"permissionDecision": "deny"}
@@ -267,7 +269,10 @@ jobs:
             analysis and false-positive filtering, with run_in_background=false.
             Other subagent types are denied. Wait for their complete reports.
             Use Read, Glob, and Grep only inside the checkout. Read may also
-            access the specific frozen-diff file above. Host files, .git metadata,
+            access the specific frozen-diff file above and the vetted repository-wide
+            file listing at ${{ runner.temp }}/security-review-files.txt.
+            Read that listing for broad discovery; broad Glob patterns matching .git
+            are denied. Host files, .git metadata,
             and paths or glob patterns escaping the checkout are denied.
             After the skill and all subagents finish, encode the completed Markdown
             findings as strings in the following final JSON envelope.
@@ -321,6 +326,14 @@ jobs:
                 | select((.input.skill // .input.name // "") == "security-review")
                 | {id, index: $i}
               ] as $calls
+            | [
+                range(0; $log | length) as $i
+                | $log[$i]
+                | select(.type == "assistant")
+                | .message.content[]?
+                | select(.type == "tool_use" and (.name == "Agent" or .name == "Task"))
+                | {id, index: $i, input, parent: $log[$i].parent_tool_use_id}
+              ] as $delegates
             | if ($calls | length) != 1 then false
               else
                 (
@@ -335,6 +348,29 @@ jobs:
                         and (.is_error != true)
                       )
                   ] | length == 1
+                )
+                and ($delegates | length > 0)
+                and (($delegates | map(.id) | unique | length) == ($delegates | length))
+                and all($delegates[];
+                  . as $delegate
+                  | (.id | type == "string" and length > 0)
+                    and .input.subagent_type == "security-review-reader"
+                    and (.input.run_in_background // false) == false
+                    and ([
+                      range(($delegate.index + 1); ($log | length)) as $i
+                      | $log[$i]
+                      | select(.type == "user" and .parent_tool_use_id == $delegate.parent)
+                      | .message.content[]?
+                      | select(.type == "tool_result" and .tool_use_id == $delegate.id)
+                      | {result: ., index: $i}
+                    ] as $results
+                    | ($results | length == 1)
+                      and ($results[0].result | .is_error != true)
+                      and ($results[0].result
+                        | (.content | type == "string" and test("\\S"))
+                          or (.content | type == "array" and length > 0
+                              and all(.[]; .type == "text" and (.text | test("\\S")))))
+                      and ($log[($results[0].index + 1):] | any(.[]; .type == "result")))
                 )
                 and (
                   $log | [.[] | select(.type == "result")] | last
