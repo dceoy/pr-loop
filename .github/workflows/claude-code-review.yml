@@ -111,6 +111,7 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           additional_permissions: |
             contents: read
+            pull_requests: read
             actions: read
           prompt: |
             Invoke Claude Code's built-in security-review via Skill
