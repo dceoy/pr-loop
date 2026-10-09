@@ -109,13 +109,14 @@ jobs:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          git diff --no-ext-diff --no-textconv "${PR_BASE_SHA}" "${PR_HEAD_SHA}" \
+          git diff --no-ext-diff --no-textconv "${PR_BASE_SHA}...${PR_HEAD_SHA}" \
             > "${RUNNER_TEMP}/security-review.diff"
       - name: Prepare read-only security tool policy
         run: |
           # Runner-local policy comes from this exact workflow, not the PR checkout.
           cat > "${RUNNER_TEMP}/security-tool-policy.py" <<'POLICY'
           import json
+          import os
           import sys
 
           # Exact commands used by the published and bundled security-review prompts.
@@ -152,18 +153,21 @@ jobs:
               if tool in {"Agent", "Task"}:
                   if (set(data) <= {"description", "prompt", "subagent_type", "model",
                                    "run_in_background", "max_turns", "effort"}
-                          and data.get("subagent_type") in {
-                              "general-purpose", "Explore", "security-review-reader",
-                          }):
-                      return {"permissionDecision": "allow", "updatedInput": {
-                          **data, "subagent_type": "security-review-reader", "run_in_background": False,
-                      }}
+                          and data.get("subagent_type") == "security-review-reader"
+                          and data.get("run_in_background", False) is False):
+                      return {"permissionDecision": "allow"}
               return {"permissionDecision": "deny"}
 
 
           try:
-              result = decision(json.load(sys.stdin))
-          except (TypeError, ValueError, AttributeError):
+              event = json.load(sys.stdin)
+              if event.get("hook_event_name") == "SubagentStart":
+                  with open(os.environ["SECURITY_AGENT_AUDIT_FILE"], "a") as audit:
+                      audit.write(json.dumps({"id": event.get("agent_id"),
+                                              "type": event.get("agent_type")}) + "\n")
+                  sys.exit(0)
+              result = decision(event)
+          except Exception:
               print("Malformed security tool request", file=sys.stderr)
               sys.exit(2)
           result["permissionDecisionReason"] = "Security review permits only bounded read-only tools"
@@ -177,9 +181,9 @@ jobs:
 
           root = Path(os.environ["RUNNER_TEMP"])
           hook = "python3 " + shlex.quote(str(root / "security-tool-policy.py"))
-          settings = {"hooks": {"PreToolUse": [{"matcher": ".*", "hooks": [
-              {"type": "command", "command": hook},
-          ]}]}}
+          hook_config = [{"matcher": ".*", "hooks": [{"type": "command", "command": hook}]}]
+          settings = {"hooks": {"PreToolUse": hook_config, "SubagentStart": hook_config}}
+          (root / "security-subagents.jsonl").write_text("")
           reader = {"security-review-reader": {
               "description": "Read-only security analysis and false-positive filtering",
               "prompt": "Analyze the supplied security task using only Read, Glob, and Grep. "
@@ -194,6 +198,7 @@ jobs:
       - name: Run first-party security review
         id: claude-security
         env:
+          SECURITY_AGENT_AUDIT_FILE: ${{ runner.temp }}/security-subagents.jsonl
           CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1'
           GIT_OPTIONAL_LOCKS: '0'
           GIT_PAGER: cat
@@ -218,8 +223,9 @@ jobs:
             Analyze security risks only. Do not edit files or publish to GitHub.
             Read the frozen diff at ${{ runner.temp }}/security-review.diff.
             The skill's injected Git reads are permitted by an exact-command policy.
-            Use foreground security-review-reader subagents for the skill's analysis
-            and false-positive filtering; wait for their complete reports.
+            Dispatch only subagent_type="security-review-reader" for the skill's
+            analysis and false-positive filtering, with run_in_background=false.
+            Other subagent types are denied. Wait for their complete reports.
             Use Read, Glob, and Grep for additional repository evidence.
             After the skill and all subagents finish, encode the completed Markdown
             findings as strings in the following final JSON envelope.
@@ -244,6 +250,7 @@ jobs:
         id: verify-security
         env:
           SECURITY_EXECUTION_FILE: ${{ steps.claude-security.outputs.execution_file }}
+          SECURITY_AGENT_AUDIT_FILE: ${{ runner.temp }}/security-subagents.jsonl
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
@@ -251,6 +258,14 @@ jobs:
             echo "::error::security-review execution transcript is unavailable"
             exit 1
           fi
+          # Observe the actual runtime agent type, independently of Agent input rewriting.
+          if ! jq -se 'length > 0 and all(.[];
+            .type == "security-review-reader" and (.id | type == "string" and length > 0))' \
+            "${SECURITY_AGENT_AUDIT_FILE}" >/dev/null; then
+            echo "::error::required read-only security subagent was not observed"
+            exit 1
+          fi
+          jq -sc '{security_subagents: .}' "${SECURITY_AGENT_AUDIT_FILE}"
           # Match the Skill call to its successful tool result, not just the
           # Claude session's terminal status (which can be success after a tool error).
           if ! jq -e --arg base "${PR_BASE_SHA}" --arg head "${PR_HEAD_SHA}" '

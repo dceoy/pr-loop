@@ -162,13 +162,15 @@ class SecurityToolPolicyTest(unittest.TestCase):
         ])
         for tool in ("Agent", "Task"):
             cases.extend((tool + agent, {"tool_name": tool, "tool_input": {
-                "subagent_type": agent, "prompt": "Analyze security", "run_in_background": True,
-            }}, True) for agent in ("general-purpose", "Explore", "security-review-reader"))
+                "subagent_type": agent, "prompt": "Analyze security", "run_in_background": False,
+            }}, agent == "security-review-reader")
+                         for agent in ("general-purpose", "Explore", "security-review-reader"))
             cases.extend((tool + key, {"tool_name": tool, "tool_input": {
-                "subagent_type": "general-purpose", key: value,
+                "subagent_type": "security-review-reader", key: value,
             }}, False) for key, value in [
                 ("isolation", "worktree"), ("team_name", "team"), ("resume", "agent-id"),
                 ("permissionMode", "bypassPermissions"), ("subagent_type", "custom-writer"),
+                ("run_in_background", True),
             ])
         source = self.embedded_source("POLICY")
         for name, request, accepted in cases:
@@ -181,8 +183,9 @@ class SecurityToolPolicyTest(unittest.TestCase):
                 output = json.loads(proc.stdout)["hookSpecificOutput"]
                 self.assertEqual(output["permissionDecision"] == "allow", accepted)
                 if accepted and request["tool_name"] in ("Agent", "Task"):
-                    self.assertEqual(output["updatedInput"]["subagent_type"], "security-review-reader")
-                    self.assertIs(output["updatedInput"]["run_in_background"], False)
+                    self.assertNotIn("updatedInput", output)
+                    self.assertEqual(request["tool_input"]["subagent_type"], "security-review-reader")
+                    self.assertIs(request["tool_input"]["run_in_background"], False)
                 if accepted and request["tool_name"] == "Bash" and "git diff" in name:
                     self.assertIn("--no-ext-diff --no-textconv", output["updatedInput"]["command"])
 
@@ -194,6 +197,58 @@ class SecurityToolPolicyTest(unittest.TestCase):
                     text=True, capture_output=True, check=False,
                 )
                 self.assertEqual(proc.returncode, 2)
+
+    def test_runtime_subagent_audit_fails_closed(self):
+        query = WORKFLOW.read_text().split("          if ! jq -se '", 1)[1].split("' \\", 1)[0]
+        valid = {"type": "security-review-reader", "id": "reader-1"}
+        cases = [
+            ("observed_reader", [valid], True),
+            ("missing_subagent", [], False),
+            ("wrong_type", [{**valid, "type": "general-purpose"}], False),
+            ("missing_id", [{"type": "security-review-reader"}], False),
+            ("additional_unsafe_agent", [valid, {**valid, "type": "Explore"}], False),
+        ]
+        for name, records, accepted in cases:
+            with self.subTest(case=name):
+                proc = subprocess.run(["jq", "-se", query],
+                                      input="\n".join(json.dumps(record) for record in records),
+                                      text=True, capture_output=True, check=False)
+                self.assertIn(proc.returncode, (0, 1), proc.stderr)
+                self.assertEqual(proc.returncode == 0, accepted)
+
+    def test_frozen_diff_excludes_changes_only_on_base(self):
+        import os
+        import tempfile
+
+        step = WORKFLOW.read_text().split("      - name: Prepare frozen security diff", 1)[1]
+        command = step.split("        run: |\n", 1)[1].split("      - name:", 1)[0]
+        command = "\n".join(line[10:] for line in command.splitlines())
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            def git(*args):
+                return subprocess.check_output(["git", "-C", directory, *args], text=True).strip()
+            git("init", "-q")
+            git("config", "user.name", "Test")
+            git("config", "user.email", "test@example.invalid")
+            (root / "common.txt").write_text("common\n")
+            git("add", ".")
+            git("commit", "-qm", "common")
+            common = git("rev-parse", "HEAD")
+            (root / "base-only.txt").write_text("base branch only\n")
+            git("add", ".")
+            git("commit", "-qm", "base advanced")
+            base = git("rev-parse", "HEAD")
+            git("checkout", "--detach", "-q", common)
+            (root / "pr-only.txt").write_text("PR branch only\n")
+            git("add", ".")
+            git("commit", "-qm", "PR change")
+            head = git("rev-parse", "HEAD")
+            subprocess.run(["bash", "-euo", "pipefail", "-c", command], cwd=directory,
+                           env={**os.environ, "RUNNER_TEMP": directory,
+                                "PR_BASE_SHA": base, "PR_HEAD_SHA": head}, check=True)
+            diff = (root / "security-review.diff").read_text()
+            self.assertIn("pr-only.txt", diff)
+            self.assertNotIn("base-only.txt", diff)
 
     def test_generated_reader_has_only_read_tools(self):
         import os
@@ -209,6 +264,16 @@ class SecurityToolPolicyTest(unittest.TestCase):
             self.assertEqual(reader["security-review-reader"]["permissionMode"], "dontAsk")
             settings = json.loads((Path(directory) / "security-settings.json").read_text())
             self.assertEqual(settings["hooks"]["PreToolUse"][0]["matcher"], ".*")
+            self.assertEqual(settings["hooks"]["SubagentStart"][0]["matcher"], ".*")
+            audit = Path(directory) / "security-subagents.jsonl"
+            subprocess.run(
+                ["python3", "-c", self.embedded_source("POLICY")],
+                input=json.dumps({"hook_event_name": "SubagentStart",
+                                  "agent_type": "security-review-reader", "agent_id": "reader-1"}),
+                text=True, env={**os.environ, "SECURITY_AGENT_AUDIT_FILE": str(audit)}, check=True,
+            )
+            self.assertEqual(json.loads(audit.read_text()),
+                             {"type": "security-review-reader", "id": "reader-1"})
 
 
 if __name__ == "__main__":
