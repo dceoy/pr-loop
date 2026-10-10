@@ -104,74 +104,10 @@ jobs:
                  .id' \
             | sort -u > "${baseline}"
           printf 'path=%s\n' "${baseline}" >> "${GITHUB_OUTPUT}"
-      - name: Guard premature Claude completion
-        run: |
-          cat > "${RUNNER_TEMP}/review-stop-hook.py" <<'PY'
-          import json
-          import os
-          from pathlib import Path
-          import subprocess
-          import sys
-
-          try:
-              event = json.load(sys.stdin)
-              if event.get("stop_hook_active"):
-                  sys.exit(0)
-              head = os.environ["PR_HEAD_SHA"]
-              repo = os.environ["GITHUB_REPOSITORY"]
-              number = os.environ["PR_NUMBER"]
-              baseline = set(Path(os.environ["REVIEW_BASELINE_PATH"]).read_text().split())
-              query = (
-                  '.[] | select(.state == "COMMENTED" and .commit_id == '
-                  + json.dumps(head)
-                  + ' and ((.body // "") | contains("<!-- pr-review-skill -->"))'
-                  + ' and ((.body // "") | contains('
-                  + json.dumps("<!-- pr-review-skill-run: " + head + "-")
-                  + '))) | .id'
-              )
-              proc = subprocess.run(
-                  ["gh", "api", "--paginate",
-                   f"repos/{repo}/pulls/{number}/reviews?per_page=100",
-                   "--jq", query],
-                  capture_output=True, text=True, check=True,
-              )
-              new_ids = set(proc.stdout.split()) - baseline
-              if len(new_ids) == 1:
-                  sys.exit(0)
-              counter = Path(os.environ["RUNNER_TEMP"]) / "review-stop-attempts"
-              tries = int(counter.read_text()) if counter.exists() else 0
-              if tries < 2:
-                  counter.write_text(str(tries + 1))
-                  print(json.dumps({
-                      "decision": "block",
-                      "reason": "The required new COMMENT review has not been "
-                                "verified for the frozen head. Resume pr-review "
-                                "and publish/verify it, or report a terminal "
-                                "failure rather than exiting prematurely.",
-                  }))
-          except (OSError, ValueError, subprocess.CalledProcessError) as exc:
-              print(f"Review stop check unavailable: {exc}", file=sys.stderr)
-              # Final GitHub verification remains authoritative.
-          PY
-          python3 - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          root = Path(os.environ["RUNNER_TEMP"])
-          settings = {"hooks": {"Stop": [{"hooks": [{
-              "type": "command",
-              "command": "python3 " + str(root / "review-stop-hook.py"),
-          }]}]}}
-          (root / "review-settings.json").write_text(json.dumps(settings))
-          PY
       - name: Run comprehensive PR review
         id: claude-review
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          REVIEW_BASELINE_PATH: ${{ steps.review-baseline.outputs.path }}
         uses: anthropics/claude-code-action@ed670b4cf9de2a5a570d130d2f6197b9e543cd64  # v1.0.240
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -196,7 +132,7 @@ jobs:
             including a clean review when no findings exist and a fresh
             pr-review-skill-run marker. Do not finish before publication is
             verified. If completion fails, report the Skill's terminal status.
-          claude_args: ${{ format('{0} --settings="{1}" --permission-mode=auto', inputs.claude-args, format('{0}/review-settings.json', runner.temp)) }}
+          claude_args: ${{ format('{0} --permission-mode=auto', inputs.claude-args) }}
       - name: Verify pr-review invocation and COMMENT publication
         id: verify-review
         if: steps.claude-review.outcome == 'success'

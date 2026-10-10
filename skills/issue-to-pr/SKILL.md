@@ -11,8 +11,11 @@ Implement one or more same-repository Issues in one pull request. Stop after cre
 
 - Freeze the requested Issue set, repository instructions, target base branch, and exact base SHA before planning.
 - Plan and implement against that frozen snapshot. If an Issue changes materially before commit, discard stale work, refresh the snapshot, and plan again.
-- Use one isolated worktree rooted at the frozen base, with at most one active writer. Preserve unrelated local work and keep changes within the accepted plan.
-- Before commit, verify the worktree/base binding, final diff, Issue requirements, and required QA.
+- Isolate implementation from unrelated work and bind it to the frozen base SHA.
+  Choose the edit mechanism supported by the client (such as a worktree,
+  checkout, or commit-based API). Keep at most one active writer and changes
+  within the accepted plan.
+- Before commit, verify the implementation/base binding, final diff, Issue requirements, and required QA.
 - Publish only a fresh branch. Create the remote ref atomically only if absent, then verify it points to the intended commit.
 - Open a PR for the requested Issues and verify repository, base, head ref, and head SHA.
 
@@ -31,7 +34,7 @@ QUESTION: <smallest missing material decision>
 
 1. Resolve all requested Issues and confirm they belong to one repository.
 2. Freeze the Issue/base snapshot and produce a valid plan.
-3. Create an isolated worktree/branch from the frozen base.
+3. Prepare an isolated implementation state at the frozen base.
 4. Implement the plan and run scoped QA. Fix only failures within scope.
 5. Re-fetch the Issues, validate the final diff and QA, then commit.
 6. Atomically create and verify the remote branch.
@@ -48,7 +51,7 @@ flowchart TD
   D -->|blocked| E{Missing decision obtained?}
   E -->|no| X
   E -->|yes| A
-  D -->|yes| F[Create isolated worktree from frozen base]
+  D -->|yes| F[Prepare isolated implementation state at frozen base]
   F --> G[Implement and run scoped QA]
   G --> H{QA passes?}
   H -->|no, fixable in scope| G
