@@ -147,7 +147,7 @@ jobs:
                       "reason": "The required new COMMENT review has not been "
                                 "verified for the frozen head. Resume pr-review "
                                 "and publish/verify it, or report a terminal "
-                                "failure rather than waiting for a subagent.",
+                                "failure rather than exiting prematurely.",
                   }))
           except (OSError, ValueError, subprocess.CalledProcessError) as exc:
               print(f"Review stop check unavailable: {exc}", file=sys.stderr)
@@ -172,7 +172,6 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REVIEW_BASELINE_PATH: ${{ steps.review-baseline.outputs.path }}
-          CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '1'
         uses: anthropics/claude-code-action@ed670b4cf9de2a5a570d130d2f6197b9e543cd64  # v1.0.240
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -187,22 +186,16 @@ jobs:
             at base ${{ github.event.pull_request.base.sha }} and
             frozen head ${{ github.event.pull_request.head.sha }}.
 
-            Let pr-review discover one suitable installed security-review Skill,
-            whether built-in or third-party. Run it only if available and safe,
-            using a bounded, read-only foreground delegate where supported.
-            If no eligible Skill or safe invocation path exists, continue the
-            regular pr-review without a separate security pass. Never install
-            a new Skill or delegate GitHub publication. When an invoked Skill
-            fails or cannot return control, follow pr-review's fail-closed rule.
-            Resume the parent pr-review after the delegate completes.
+            Follow pr-review's optional security-review policy: an available
+            built-in or third-party Skill may augment the review. Select the
+            execution method yourself. If none is usable, run pr-review alone.
+            Do not install additional Skills or change repository files.
 
-            Validate and deduplicate findings, then publish and verify exactly
-            one COMMENT review for this invocation, including a nonempty clean
-            review when no actionable defects exist and a fresh
-            pr-review-skill-run marker. A successful model response is not proof
-            of publication. Do not edit repository files. If review cannot be
-            completed, report STATUS: failed or unsupported as appropriate.
-            Do not finish with an unfinished subagent or publication task.
+            Complete all applicable discovery and validation before posting.
+            Publish and verify exactly one COMMENT review on the frozen head,
+            including a clean review when no findings exist and a fresh
+            pr-review-skill-run marker. Do not finish before publication is
+            verified. If completion fails, report the Skill's terminal status.
           claude_args: ${{ format('{0} --settings="{1}" --permission-mode=auto', inputs.claude-args, format('{0}/review-settings.json', runner.temp)) }}
       - name: Verify pr-review invocation and COMMENT publication
         id: verify-review

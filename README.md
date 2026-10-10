@@ -79,8 +79,9 @@ The workflow keeps broad caller-configured Claude Code permissions and relies
 on the selected skill to honor the review-only instructions; it does **not**
 enforce a separate read-only security sandbox. A bounded Stop hook discourages
 premature completion, while a subsequent GitHub API check independently
-requires exactly one new `COMMENT` review for the frozen head. This does not
-guarantee a security skill is present or that subagent completion will succeed.
+requires exactly one new `COMMENT` review for the frozen head. The client
+agent chooses how to execute optional security discovery; a Skill's presence
+or successful completion is not guaranteed.
 
 ## Usage
 
