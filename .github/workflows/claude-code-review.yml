@@ -117,21 +117,14 @@ jobs:
             issues: read
             actions: read
           prompt: |
-            Invoke the pinned pr-review Skill exactly once with publication enabled.
-            Review ${{ github.repository }} PR #${{ github.event.pull_request.number }}
-            at base ${{ github.event.pull_request.base.sha }} and
-            frozen head ${{ github.event.pull_request.head.sha }}.
-
-            Follow pr-review's optional security-review policy: an available
-            built-in or third-party Skill may augment the review. Select the
-            execution method yourself. If none is usable, run pr-review alone.
-            Do not install additional Skills or change repository files.
-
-            Complete all applicable discovery and validation before posting.
-            Publish and verify exactly one COMMENT review on the frozen head,
-            including a clean review when no findings exist and a fresh
-            pr-review-skill-run marker. Do not finish before publication is
-            verified. If completion fails, report the Skill's terminal status.
+            Invoke the pinned pr-review Skill exactly once for
+            ${{ github.repository }}#${{ github.event.pull_request.number }},
+            base ${{ github.event.pull_request.base.sha }},
+            head ${{ github.event.pull_request.head.sha }}.
+            Follow the Skill's optional security-review policy and publish
+            exactly one verified COMMENT review on the frozen head, including
+            a clean result when no findings remain. Do not modify files.
+            If the review cannot complete, report the Skill's terminal status.
           claude_args: ${{ format('{0} --permission-mode=auto', inputs.claude-args) }}
       - name: Verify pr-review invocation and COMMENT publication
         id: verify-review
@@ -148,19 +141,13 @@ jobs:
             exit 1
           fi
           if ! jq -e '
-            any(
-              .[];
-              .type == "assistant"
-              and .parent_tool_use_id == null
-              and any(
-                .message.content[]?;
-                .type == "tool_use"
-                and .name == "Skill"
-                and ((.input.skill // .input.name // "") == "pr-review")
-              )
-            )
+            [.[] | select(.type == "assistant" and .parent_tool_use_id == null)
+              | .message.content[]?
+              | select(.type == "tool_use" and .name == "Skill"
+                and ((.input.skill // .input.name // "") == "pr-review"))]
+            | length == 1
           ' "${CLAUDE_EXECUTION_FILE}" >/dev/null; then
-            echo "::error::expected top-level pr-review Skill invocation"
+            echo "::error::expected exactly one top-level pr-review Skill invocation"
             exit 1
           fi
           current="${RUNNER_TEMP}/pr-review-current-ids"

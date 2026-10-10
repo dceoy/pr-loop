@@ -68,7 +68,7 @@ flowchart TD
   R -->|no, exhausted| X
   R -->|yes| S[Commit]
   S --> H[Conditional update and verify remote]
-  H --> I{Push verified?}
+  H --> I{Update verified?}
   I -->|remote changed| A
   I -->|persistent failure| X
   I -->|yes| J[Set expected_head to pushed SHA]
