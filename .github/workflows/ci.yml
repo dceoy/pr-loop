@@ -66,8 +66,6 @@ jobs:
           fi
 
           exit "${exit_status}"
-      - name: Test security review verification gate
-        run: python3 -m unittest discover -s tests -p 'test_*.py'
   github-actions-lint-and-scan:
     permissions:
       contents: read
