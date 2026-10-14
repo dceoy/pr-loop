@@ -151,7 +151,7 @@ jobs:
       - prepare-release
       - github-release
     permissions:
-      contents: read
+      contents: write  # Required by the reusable workflow's release-attachment job
     uses: dceoy/gha-for-devops/.github/workflows/agent-skills-package.yml@main  # zizmor: ignore[unpinned-uses]
   attach-release-assets:
     if: needs.prepare-release.outputs.publish == 'true'
