@@ -1,0 +1,9 @@
+{
+  "name": "pr-loop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Installable pr-review agent skill from pr-loop",
+  "files": [
+    "skills/pr-review"
+  ]
+}
