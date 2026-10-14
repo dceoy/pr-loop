@@ -47,8 +47,15 @@ jobs:
           fi
 
           ref_api="repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}"
-          if tag_sha="$(gh api "${ref_api}" --jq '.object.sha' 2>/dev/null)"; then
-            if [[ "${tag_sha}" != "${GITHUB_SHA}" ]]; then
+          if tag_object="$(gh api "${ref_api}" --jq '.object' 2>/dev/null)"; then
+            tag_type="$(jq -r '.type' <<< "${tag_object}")"
+            tag_sha="$(jq -r '.sha' <<< "${tag_object}")"
+            while [[ "${tag_type}" == 'tag' ]]; do
+              tag_object="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_sha}" --jq '.object')"
+              tag_type="$(jq -r '.type' <<< "${tag_object}")"
+              tag_sha="$(jq -r '.sha' <<< "${tag_object}")"
+            done
+            if [[ "${tag_type}" != 'commit' || "${tag_sha}" != "${GITHUB_SHA}" ]]; then
               echo "::error::${tag} already points to another commit"
               exit 1
             fi
