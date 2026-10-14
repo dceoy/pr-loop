@@ -67,13 +67,3 @@ jobs:
     with:
       tag-name: ${{ needs.prepare-release.outputs.tag }}
       create-new-tag: false
-  package-release:
-    if: needs.prepare-release.outputs.publish == 'true'
-    needs:
-      - prepare-release
-      - github-release
-    permissions:
-      contents: write  # Required by the reusable workflow's release-attachment job
-    uses: dceoy/gha-for-devops/.github/workflows/agent-skills-package.yml@main  # zizmor: ignore[unpinned-uses]
-    with:
-      release-tag: ${{ needs.prepare-release.outputs.tag }}
