@@ -1,0 +1,77 @@
+---
+name: Publish GitHub Release
+on:
+  workflow_dispatch:
+concurrency:
+  group: github-release-${{ github.repository }}
+  cancel-in-progress: false
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash -euo pipefail {0}
+    working-directory: .
+jobs:
+  prepare-release:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      publish: ${{ steps.version.outputs.publish }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Resolve version and create its immutable tag
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ "${GITHUB_REF}" != 'refs/heads/main' ]]; then
+            echo "::error::Releases must be dispatched from the main branch"
+            exit 1
+          fi
+
+          version="$(jq -er '.version | select(type == "string")' package.json)"
+          if [[ ! "${version}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::package.json version must be a stable semantic version"
+            exit 1
+          fi
+
+          tag="v${version}"
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+          if gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "publish=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          ref_api="repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}"
+          if tag_object="$(gh api "${ref_api}" --jq '.object' 2>/dev/null)"; then
+            tag_type="$(jq -r '.type' <<< "${tag_object}")"
+            tag_sha="$(jq -r '.sha' <<< "${tag_object}")"
+            while [[ "${tag_type}" == 'tag' ]]; do
+              tag_object="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_sha}" --jq '.object')"
+              tag_type="$(jq -r '.type' <<< "${tag_object}")"
+              tag_sha="$(jq -r '.sha' <<< "${tag_object}")"
+            done
+            if [[ "${tag_type}" != 'commit' || "${tag_sha}" != "${GITHUB_SHA}" ]]; then
+              echo "::error::${tag} already points to another commit"
+              exit 1
+            fi
+          else
+            gh api "repos/${GITHUB_REPOSITORY}/git/refs" --method POST \
+              -f "ref=refs/tags/${tag}" -f "sha=${GITHUB_SHA}" >/dev/null
+          fi
+          echo "publish=true" >> "${GITHUB_OUTPUT}"
+  github-release:
+    if: needs.prepare-release.outputs.publish == 'true'
+    needs:
+      - prepare-release
+    permissions:
+      contents: write
+    uses: dceoy/gha-for-devops/.github/workflows/github-release.yml@main  # zizmor: ignore[unpinned-uses]
+    with:
+      tag-name: ${{ needs.prepare-release.outputs.tag }}
+      create-new-tag: false
