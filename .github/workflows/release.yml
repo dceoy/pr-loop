@@ -75,28 +75,5 @@ jobs:
     permissions:
       contents: write  # Required by the reusable workflow's release-attachment job
     uses: dceoy/gha-for-devops/.github/workflows/agent-skills-package.yml@main  # zizmor: ignore[unpinned-uses]
-  attach-release-assets:
-    if: needs.prepare-release.outputs.publish == 'true'
-    needs:
-      - prepare-release
-      - package-release
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v8  # zizmor: ignore[unpinned-uses]
-        with:
-          name: agent-skills
-          path: ${{ runner.temp }}/agent-skills-release-assets
-      - name: Upload skills to GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ needs.prepare-release.outputs.tag }}
-        run: |
-          shopt -s nullglob
-          assets=("${RUNNER_TEMP}/agent-skills-release-assets/"*.zip)
-          if (( ${#assets[@]} == 0 )); then
-            echo "::error::no skill ZIP archives to upload"
-            exit 1
-          fi
-          gh release upload "${RELEASE_TAG}" "${assets[@]}" --repo "${GITHUB_REPOSITORY}" --clobber
+    with:
+      release-tag: ${{ needs.prepare-release.outputs.tag }}
