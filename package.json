@@ -1,0 +1,9 @@
+{
+  "name": "pr-loop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Installable agent skills for the Issue/PR loop",
+  "files": [
+    "skills"
+  ]
+}
