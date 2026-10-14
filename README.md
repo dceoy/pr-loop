@@ -34,6 +34,7 @@ For an existing pull request, `pr-loop` starts at `pr-review`.
 - Exact implementation base: `issue-to-pr` binds implementation to an exact base and creates a fresh verified PR branch.
 - Frozen-head review: `pr-review` analyzes one immutable snapshot and, when composed, publishes explicitly against that reviewed SHA.
 - Live-head triage: `pr-feedback-triage` follows current head/feedback changes and rejects stale prepared actions before mutation.
+- Model-directed recovery: triage autonomously diagnoses recoverable failures and chooses safe, bounded remediation without relaxing QA or publication gates.
 - Final-head review: if triage changes the head, `pr-loop` starts another review round before success.
 - Fail closed: unsafe repository state, unresolved required QA/publication failures, stale state, exhausted caller limits, missing mandatory capabilities, unresolved actionable feedback, or active `CHANGES_REQUESTED` reviews stop the relevant procedure.
 - No third-party wait: triage published bot/human feedback, but never await pending or running third-party reviews or future comments.
