@@ -69,7 +69,7 @@ jobs:
       - prepare-release
     permissions:
       contents: write
-    uses: dceoy/gha-for-devops/.github/workflows/github-release.yml@main  # zizmor: ignore[unpinned-uses]
+    uses: dceoy/gha-for-devops/.github/workflows/github-release.yml@99086334b0ccd52ad2b614e96a40c1472cd2aceb
     with:
       tag-name: ${{ needs.prepare-release.outputs.tag }}
       create-new-tag: false
@@ -79,6 +79,6 @@ jobs:
       - github-release
     permissions:
       contents: write
-    uses: dceoy/gha-for-devops/.github/workflows/agent-skills-package.yml@main  # zizmor: ignore[unpinned-uses]
+    uses: dceoy/gha-for-devops/.github/workflows/agent-skills-package.yml@99086334b0ccd52ad2b614e96a40c1472cd2aceb
     with:
       release-tag: ${{ needs.prepare-release.outputs.tag }}
