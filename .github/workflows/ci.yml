@@ -71,9 +71,9 @@ jobs:
       contents: read
       security-events: write
       actions: read
-    uses: dceoy/gha-for-devops/.github/workflows/github-actions-lint-and-scan.yml@99086334b0ccd52ad2b614e96a40c1472cd2aceb
+    uses: dceoy/gha-for-devops/.github/workflows/github-actions-lint-and-scan.yml@3754118ff454057e560e78b3bf46178ebb756506
   markdown-lint:
-    uses: dceoy/gha-for-devops/.github/workflows/markdown-lint.yml@99086334b0ccd52ad2b614e96a40c1472cd2aceb
+    uses: dceoy/gha-for-devops/.github/workflows/markdown-lint.yml@3754118ff454057e560e78b3bf46178ebb756506
   dependabot-auto-merge:
     if: >
       github.event_name == 'pull_request' && github.actor == 'dependabot[bot]'
@@ -81,7 +81,7 @@ jobs:
       - skill-structure
       - github-actions-lint-and-scan
       - markdown-lint
-    uses: dceoy/gha-for-devops/.github/workflows/dependabot-auto-merge.yml@99086334b0ccd52ad2b614e96a40c1472cd2aceb
+    uses: dceoy/gha-for-devops/.github/workflows/dependabot-auto-merge.yml@3754118ff454057e560e78b3bf46178ebb756506
     permissions:
       contents: write
       pull-requests: write

@@ -69,7 +69,7 @@ jobs:
       - prepare-release
     permissions:
       contents: write
-    uses: dceoy/gha-for-devops/.github/workflows/github-release.yml@99086334b0ccd52ad2b614e96a40c1472cd2aceb
+    uses: dceoy/gha-for-devops/.github/workflows/github-release.yml@3754118ff454057e560e78b3bf46178ebb756506
     with:
       tag-name: ${{ needs.prepare-release.outputs.tag }}
       create-new-tag: false
@@ -79,6 +79,6 @@ jobs:
       - github-release
     permissions:
       contents: write
-    uses: dceoy/gha-for-devops/.github/workflows/agent-skills-package.yml@99086334b0ccd52ad2b614e96a40c1472cd2aceb
+    uses: dceoy/gha-for-devops/.github/workflows/agent-skills-package.yml@3754118ff454057e560e78b3bf46178ebb756506
     with:
       release-tag: ${{ needs.prepare-release.outputs.tag }}
