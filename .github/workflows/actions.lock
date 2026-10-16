@@ -8,7 +8,7 @@ workflows:
         - 'actions/checkout@v7'
     '.github/workflows/claude-code-review.yml':
         - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
-        - 'anthropics/claude-code-action@6fed3ca145920b639991cb756090506e1bcaf515'
+        - 'anthropics/claude-code-action@2dca132ff0e0c4094ce6048b422c6915a071210b'
     '.github/workflows/claude.yml': []
     '.github/workflows/release.yml':
         - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
@@ -23,9 +23,9 @@ dependencies:
         commit: 'sha1-3d3c42e5aac5ba805825da76410c181273ba90b1'
         owner_id: 44036562
         repo_id: 197814629
-    'anthropics/claude-code-action@6fed3ca145920b639991cb756090506e1bcaf515':
-        ref: 'v1.0.245'
-        commit: 'sha1-6fed3ca145920b639991cb756090506e1bcaf515'
+    'anthropics/claude-code-action@2dca132ff0e0c4094ce6048b422c6915a071210b':
+        ref: 'v1.0.247'
+        commit: 'sha1-2dca132ff0e0c4094ce6048b422c6915a071210b'
         owner_id: 76263028
         repo_id: 986421638
         uses:
