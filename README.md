@@ -4,10 +4,10 @@
 
 `pr-loop` provides four portable skills that can be used independently, with `pr-loop` composing the other three into an end-to-end Issue/PR loop.
 
-- [`issue-to-pr`](skills/issue-to-pr/SKILL.md): implement same-repository Issues and stop after creating and verifying the PR.
+- [`issue-to-pr`](skills/issue-to-pr/SKILL.md): plan one or more same-repository Issues as single, independent, or stacked PRs, then create and verify each PR.
 - [`pr-review`](skills/pr-review/SKILL.md): review one frozen PR head with adaptive risk-driven analysis and verified `COMMENT` publication.
 - [`pr-feedback-triage`](skills/pr-feedback-triage/SKILL.md): reconcile feedback and failed current-head CI, apply focused fixes, and finish replies/resolutions.
-- [`pr-loop`](skills/pr-loop/SKILL.md): compose those phases until the stable final head is reviewed and published feedback is reconciled.
+- [`pr-loop`](skills/pr-loop/SKILL.md): compose those phases across each PR in dependency order until every final base/head snapshot is reviewed, published feedback is reconciled, and completed CI failures are assessed.
 
 Each standalone skill owns its own mechanics and result contract. The composite skill reuses those procedures without duplicating their policies.
 
@@ -15,7 +15,7 @@ Each standalone skill owns its own mechanics and result contract. The composite 
 
 ```mermaid
 flowchart LR
-  I[Issue] --> P[issue-to-pr] --> PR[Pull request]
+  I[Issue] --> P[issue-to-pr] --> PR[One or more pull requests]
   PR --> R[pr-review<br/>frozen head]
   R --> F[pr-feedback-triage<br/>feedback + current-head CI]
   F --> D{Post-triage state?}
@@ -26,16 +26,18 @@ flowchart LR
   P -->|cannot complete| X
 ```
 
-For an existing pull request, `pr-loop` starts at `pr-review`.
+`issue-to-pr` defaults to one PR. It creates independent PRs for unrelated changes or stacked PRs when successive changes depend on earlier ones, including when an Issue explicitly requires multiple PRs. Each stack is a linear chain rooted at the target branch; independent branches remain separate. See [multi-PR behavior](skills/issue-to-pr/references/multi-pr.md).
+
+For an existing pull request, `pr-loop` starts at `pr-review` and handles only that PR unless a requested stack can be verified. Stacked PR feedback is reconciled bottom-up; changes to a lower layer invalidate affected downstream reviews.
 
 ## Core guarantees
 
 - Single writer: at most one repository writer is active during a mutation phase, and GitHub mutations are serialized against validated state.
-- Exact implementation base: `issue-to-pr` binds implementation to an exact base and creates a fresh verified PR branch.
+- Exact implementation base: `issue-to-pr` pins the target base and each dependent layer's verified parent, and publishes fresh verified PR branches.
 - Frozen-head review: `pr-review` analyzes one immutable snapshot and, when composed, publishes explicitly against that reviewed SHA.
 - Live-head triage: `pr-feedback-triage` follows current head/feedback changes, diagnoses completed current-head CI failures, and rejects stale prepared actions before mutation.
 - Model-directed recovery: triage autonomously diagnoses recoverable failures and chooses safe, bounded remediation without relaxing QA or publication gates.
-- Final-head review: if triage changes the head, `pr-loop` starts another review round before success.
+- Final-head/base review: if triage or stack propagation changes a reviewed head or base, `pr-loop` requires another review of the affected snapshot before success.
 - Fail closed: unsafe repository state, unresolved required QA/publication failures, stale state, exhausted caller limits, missing mandatory capabilities, unresolved actionable feedback, or active `CHANGES_REQUESTED` reviews stop the relevant procedure.
 - No third-party wait: triage published bot/human feedback, but never await pending or running third-party reviews or future comments.
 - CI remediation: completed failed checks are diagnosed and fixed when in scope; pending checks are not polled, and subsequent commits require fresh head-bound checks.
@@ -44,7 +46,8 @@ For an existing pull request, `pr-loop` starts at `pr-review`.
 ## Requirements
 
 - Git and authenticated GitHub access through `gh` or an equivalent integration.
-- A coding-agent runtime with GitHub/repository access and finite loop bounds. `pr-loop` defaults to 3 review rounds, while `pr-feedback-triage` defaults to 9 triage restarts when callers do not specify overrides.
+- A coding-agent runtime with GitHub/repository access and finite loop bounds. `pr-loop` defaults to 3 review rounds per PR and 3 graph passes for multi-PR runs; `pr-feedback-triage` defaults to 9 restarts per PR.
+- For GitHub-native stacked PR linkage, repository support and a suitable stack-aware client (such as `gh stack`) are required. The skills do not install tools; when unavailable, they may produce explicitly identified ordinary branch-based dependent PRs using safe repository APIs.
 
 ## Reusable workflow
 
@@ -90,6 +93,7 @@ or successful completion is not guaranteed.
 ```text
 Implement https://github.com/OWNER/REPO/issues/123 with issue-to-pr
 Implement https://github.com/OWNER/REPO/issues/123 with pr-loop
+Implement https://github.com/OWNER/REPO/issues/123 and #124 as reviewable stacked PRs with pr-loop
 Run pr-loop on https://github.com/OWNER/REPO/pull/456  # review/triage bounds are optional
 Review https://github.com/OWNER/REPO/pull/456 with pr-review
 Triage https://github.com/OWNER/REPO/pull/456 with pr-feedback-triage
