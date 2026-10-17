@@ -14,11 +14,15 @@ Each sibling owns its standalone mechanics and safety contract.
 1. For an Issue start, run `issue-to-pr` for the complete requested Issue set and continue only after `STATUS: complete` with a verified PR.
 2. Freeze the current PR head as `reviewed_target`.
 3. Run `pr-review` for that exact SHA with publication enabled. Continue only after `STATUS: reviewed` and `REVIEWED_HEAD == reviewed_target`.
-4. Run `pr-feedback-triage` against the latest live PR state, including completed CI failures for its head, and retain its exact final head, feedback snapshot, and reported CI status. Continue only after `STATUS: complete`.
-5. Re-fetch the live head and complete feedback (refresh CI status for reporting, not snapshot equality):
+4. Run `pr-feedback-triage` against the latest live PR state, including completed CI failures for its head, and retain its exact final head, feedback snapshot, reported CI status, and ledger of assessed failure identities/attempts. Continue only after `STATUS: complete`.
+5. Re-fetch the live head, complete feedback, and current-head CI results:
    - if feedback changed while the head stayed the same, triage again;
    - if the head changed, start another review round;
-   - if state matches the retained triage snapshot and the head equals the latest reviewed head, continue.
+   - if head/feedback match but newly completed applicable failures are absent from the retained assessment ledger, re-enter triage for those failures within the CI re-entry bound, then refresh the retained snapshot and ledger;
+   - otherwise, if state matches the retained triage snapshot and the head equals the latest reviewed head, continue.
+
+   Compare failures by head SHA, check run ID and attempt, or external status context and status ID. Already assessed failures, including unfixable failures, do not trigger re-entry. Observe CI only at these state checks; never wait or poll for pending checks.
+
 6. Succeed if the final head is reviewed and all published actionable feedback in the stable snapshot is reconciled. Stop for an active `CHANGES_REQUESTED` review or unresolved actionable feedback.
 
 Do not wait or poll for pending, running, or requested third-party reviews (including bots). Triage third-party feedback already published at the final snapshot, including comments on older heads, against the latest head. Feedback published after the final snapshot is for a later run.
@@ -45,7 +49,10 @@ flowchart TD
   E -->|yes| F{Live state matches triage snapshot?}
   F -->|no, same head| D
   F -->|no, head changed| A
-  F -->|yes| G{Final head equals reviewed head?}
+  F -->|yes| K{New unassessed CI failures?}
+  K -->|yes, within bound| D
+  K -->|yes, bound exhausted| X
+  K -->|no| G{Final head equals reviewed head?}
   G -->|no| A
   G -->|yes| H{Unresolved feedback or active CHANGES_REQUESTED?}
   H -->|yes| X
@@ -57,7 +64,8 @@ flowchart TD
 Keep review-round and triage-restart limits separate. Caller/runtime values override defaults.
 
 - review rounds: default maximum 3;
-- triage restarts: use `pr-feedback-triage`'s default maximum 9.
+- triage restarts: use `pr-feedback-triage`'s default maximum 9;
+- CI re-entries: default maximum 3 per overall loop run, separate from snapshot restarts and not reset by head changes. Stop and report unassessed failures when exhausted.
 
 If an applicable bound is exhausted, stop. If a required finite bound or mandatory operation cannot be provided, return `unsupported`.
 

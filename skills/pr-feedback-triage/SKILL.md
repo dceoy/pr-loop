@@ -42,8 +42,11 @@ At each live-head snapshot, inspect available GitHub Actions check runs and
 external commit-status contexts for the exact PR head SHA, not a synthetic
 merge ref or an older commit. Follow result pagination, identify the latest
 attempt for each check/context, and obtain relevant failed job/step logs when
-accessible. Preserve check identifiers and URLs as evidence; CI is not a
-review thread and requires no reply or resolution.
+accessible. Preserve check identifiers and URLs as evidence, and retain a ledger of
+assessed failures keyed by head SHA, check run ID and attempt, or external
+status context and status ID. Include unfixable failures in the ledger and
+return it to a composing caller. CI is not a review thread and requires no
+reply or resolution.
 
 - Distinguish completed failures from queued/running, successful, skipped,
   cancelled, and unavailable results. Never infer success from missing checks
@@ -64,13 +67,23 @@ review thread and requires no reply or resolution.
   attempted fix, and blocker. Missing checks or permissions are `unknown`,
   not `passed`.
 
-Classify final-head CI as `failed` if any current applicable check failed,
-`pending` if none failed but some are queued/running, `passed` only if
-observed applicable checks have completed successfully with no pending or
-unknown outcomes, and `unknown` if checks are absent or cannot be assessed.
-These observations do not establish branch-protection or merge readiness.
+Map each latest applicable result before classifying final-head CI:
+
+- `failure`, `timed_out`, `action_required`, or `startup_failure` check
+  conclusions, and `failure` or `error` commit statuses, map to `failed`.
+- Queued/running checks and `pending` commit statuses map to `pending`.
+- `success` check conclusions and commit statuses map to `passed`.
+- Completed `skipped`, `cancelled`, `neutral`, `stale`, missing, or
+  unrecognized conclusions map to `unknown`; they do not prove that the
+  applicable check ran successfully and are not automatic fix candidates.
+
+Aggregate with precedence `failed` > `pending` > `unknown` > `passed`.
+Report `unknown` if no applicable results are observed or results cannot be
+assessed. Report `passed` only when every observed applicable result maps to
+`passed`. These observations do not establish branch-protection or merge readiness.
 CI state changes alone do not invalidate the feedback snapshot or cause a
 triage restart; an unexpected head or feedback change still does.
+
 ## Procedure
 
 1. Snapshot the live head, feedback, and CI; analyze feedback dispositions and completed failed checks.
