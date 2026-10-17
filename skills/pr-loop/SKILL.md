@@ -5,7 +5,7 @@ description: Implement same-repository GitHub Issues into a reviewed pull reques
 
 # PR Loop
 
-Compose [`issue-to-pr`](../issue-to-pr/SKILL.md), [`pr-review`](../pr-review/SKILL.md), and [`pr-feedback-triage`](../pr-feedback-triage/SKILL.md) until the stable final PR head is reviewed and all observed feedback is triaged.
+Compose [`issue-to-pr`](../issue-to-pr/SKILL.md), [`pr-review`](../pr-review/SKILL.md), and [`pr-feedback-triage`](../pr-feedback-triage/SKILL.md) until the stable final PR head is reviewed, all observed feedback is triaged, and completed CI failures have been assessed for in-scope fixes.
 
 Each sibling owns its standalone mechanics and safety contract.
 
@@ -14,8 +14,8 @@ Each sibling owns its standalone mechanics and safety contract.
 1. For an Issue start, run `issue-to-pr` for the complete requested Issue set and continue only after `STATUS: complete` with a verified PR.
 2. Freeze the current PR head as `reviewed_target`.
 3. Run `pr-review` for that exact SHA with publication enabled. Continue only after `STATUS: reviewed` and `REVIEWED_HEAD == reviewed_target`.
-4. Run `pr-feedback-triage` against the latest live PR state and retain its exact final head and feedback snapshot. Continue only after `STATUS: complete`.
-5. Re-fetch the live head and complete feedback:
+4. Run `pr-feedback-triage` against the latest live PR state, including completed CI failures for its head, and retain its exact final head, feedback snapshot, and reported CI status. Continue only after `STATUS: complete`.
+5. Re-fetch the live head and complete feedback (refresh CI status for reporting, not snapshot equality):
    - if feedback changed while the head stayed the same, triage again;
    - if the head changed, start another review round;
    - if state matches the retained triage snapshot and the head equals the latest reviewed head, continue.
@@ -23,7 +23,7 @@ Each sibling owns its standalone mechanics and safety contract.
 
 Do not wait or poll for pending, running, or requested third-party reviews (including bots). Triage third-party feedback already published at the final snapshot, including comments on older heads, against the latest head. Feedback published after the final snapshot is for a later run.
 
-Treat CI failures, branch-protection requirements, mergeability, and deployment/acceptance checks as merge-readiness findings, not `pr-loop` completion blockers. Report them without bypassing protections, attempting an unauthorized merge, or claiming the PR or its Issue is complete.
+Treat completed current-head CI failures as remediation candidates during triage, not merely passive merge-readiness findings. Do not wait or poll for pending CI, and do not require newly triggered checks to finish before loop completion. Report final-head CI status (passed/failed/pending/unknown), unresolved failures, branch-protection requirements, mergeability, and deployment/acceptance checks separately; none implies permission to bypass protections, merge, or claim the PR or its Issue is complete.
 
 Do not clear reviewer state merely to satisfy the loop.
 
@@ -63,8 +63,8 @@ If an applicable bound is exhausted, stop. If a required finite bound or mandato
 
 ## Result
 
-- `success`: live head/feedback equal the latest triage-complete snapshot, live head equals the latest reviewed head, and no unresolved actionable feedback or active `CHANGES_REQUESTED` review remains. This does not imply the PR is mergeable or the Issue is closed.
+- `success`: live head/feedback equal the latest triage-complete snapshot, live head equals the latest reviewed head, and no unresolved actionable feedback or active `CHANGES_REQUESTED` review remains. Completed CI failures have been evaluated for in-scope fixes; success does not imply CI passed, the PR is mergeable, or the Issue is closed.
 - `stopped`: a phase, state check, permission, exhausted bound, unresolved actionable feedback, or active `CHANGES_REQUESTED` review prevents success.
 - `unsupported`: a required capability/resource or finite bound is unavailable.
 
-Report the outcome, resulting PR/Issues when applicable, review rounds and final reviewed head, triage final head/restarts, any feedback blocker, and outstanding CI, merge, or deployment/acceptance requirements separately.
+Report the outcome, resulting PR/Issues when applicable, review rounds and final reviewed head, triage final head/restarts, any feedback blocker, and final-head `CI_STATUS`, failed check URLs/remediation attempts, and outstanding merge or deployment/acceptance requirements separately.
