@@ -149,47 +149,6 @@ weaken required tests, or publish unverified fixes. Stop when recovery is unsafe
 out of scope, or no reasonable next step remains, and report the blocker and
 attempted recovery.
 
-## Flow
-
-```mermaid
-flowchart TD
-  A[Snapshot live head, feedback, and CI] --> B[Validate feedback and failed CI]
-  B --> C{State still current?}
-  C -->|no, bound permits| A
-  C -->|no, exhausted| X[Stopped]
-  C -->|yes| D{Fixes needed?}
-  D -->|yes| E[Apply smallest fixes and run scoped QA]
-  E --> F{QA passes?}
-  F -->|no, recoverable in scope| E
-  F -->|no| X
-  F -->|yes| G[Revalidate state and diff]
-  G --> R{Snapshot still current?}
-  R -->|no, bound permits| A
-  R -->|no, exhausted| X
-  R -->|yes| S[Commit]
-  S --> H[Conditional update and verify remote]
-  H --> I{Update verified?}
-  I -->|remote changed| A
-  I -->|persistent failure| X
-  I -->|yes| J[Set expected_head to pushed SHA]
-  D -->|no| K[Set expected_head to analyzed head]
-  J --> L[Revalidate expected_head]
-  K --> L
-  L --> M{State still current?}
-  M -->|no, bound permits| A
-  M -->|no, exhausted| X
-  M -->|yes| N[Reply and resolve eligible threads]
-  N --> O{Final head, feedback and association match?}
-  O -->|no, bound permits| A
-  O -->|no, exhausted| X
-  O -->|yes| C1{Unassessed completed CI failures?}
-  C1 -->|yes, within CI bound| A
-  C1 -->|yes, exhausted| X
-  C1 -->|no| P{Completion blocker?}
-  P -->|yes| X
-  P -->|no| Q[Complete]
-```
-
 ## Restart and blockers
 
 The default restart limit is 9 actual state-change restarts after the initial snapshot; a caller/runtime bound may override it. Stop with `limit_exhausted` when the bound is consumed.

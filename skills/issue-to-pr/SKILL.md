@@ -52,25 +52,6 @@ QUESTION: <smallest missing material decision>
 7. For native stacks, link the verified chain using supported GitHub stack tooling and verify its membership. Otherwise explicitly report a branch-based PR chain without claiming native stack metadata.
 8. Re-fetch the complete PR set and dependencies; finish only when all planned PRs and edges are verified. On partial publication, return `stopped` with the verified created PRs and exact recovery state.
 
-## Flow
-
-```mermaid
-flowchart TD
-  A[Freeze Issues and base] --> B{Safe reviewable plan?}
-  B -->|no| X[Stopped]
-  B -->|yes| C[Select single, independent, stacked or mixed]
-  C --> D[Implement next PR at verified parent]
-  D --> E{Scoped QA, diff and Issue snapshot valid?}
-  E -->|no| X
-  E -->|yes| F[Create-only branch and verify PR base/head]
-  F --> G{More planned PRs?}
-  G -->|yes| D
-  G -->|no| H[Verify complete PR set and stack relationships]
-  H --> I{All verified?}
-  I -->|no| X
-  I -->|yes| J[Complete]
-```
-
 ## Result
 
 Return `STATUS: complete | stopped | unsupported`.

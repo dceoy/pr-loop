@@ -37,32 +37,6 @@ Treat completed CI failures on the current head and validated test-merge target 
 
 Do not clear reviewer state merely to satisfy the loop.
 
-## Flow
-
-```mermaid
-flowchart TD
-  S{Start} -->|Issues| I[Create verified PR graph]
-  S -->|Existing PR| A[Single PR or verified requested stack]
-  I --> A
-  A --> B[Next PR in dependency order]
-  B --> C[Freeze base and head; review]
-  C --> D[Feedback and CI triage]
-  D --> E{Head and base stable?}
-  E -->|no| F{Stack propagation needed?}
-  F -->|yes| G[Safely propagate and invalidate descendants]
-  G --> B
-  F -->|no| C
-  E -->|yes| K{Feedback stable?}
-  K -->|no| D
-  K -->|yes| H{More PRs?}
-  H -->|yes| B
-  H -->|no| V[Final graph validation; invoke triage for CI refresh]
-  V --> J{Graph and final triage snapshots reconciled?}
-  J -->|no, within bounds| B
-  J -->|no, exhausted| X[Stopped]
-  J -->|yes| Y[Success]
-```
-
 ## Bounds
 
 Keep review-round, triage-restart, and graph-reconciliation limits separate. Triage owns its CI remediation bound, including across final graph validation invocations. Caller/runtime values override defaults.
