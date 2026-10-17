@@ -9,6 +9,14 @@ Implement one or more same-repository Issues as the smallest reviewable PR set. 
 
 For multi-PR plans, read and follow [references/multi-pr.md](references/multi-pr.md). If that required reference is inaccessible, return `STATUS: unsupported`.
 
+## Working style
+
+- Before planning, read what the task depends on even when the request does not point to it: repository instructions (`AGENTS.md`, `CLAUDE.md`, contributing guides), linked Issues, Issue comments, referenced PRs, and the code and tests around the change.
+- Carry the work through to a verified PR. Do not pause to confirm a plan or ask a question you can answer from the repository; use `STATUS: blocked` only for a missing material decision.
+- Implement what the Issues require. Add tests, docs, or refactors only when the Issue or repository conventions call for them; mention other ideas in the final report.
+- Before committing, run a real check that exercises the change: the project's tests, type-checker, or build, or the changed command itself. A syntax-only check or a command that failed to start does not count. If only declared dependencies are missing, install them with the project's own package manager and lockfile, never with `sudo` or the system package manager. If no real check can run, name the check you skipped and why in the result.
+- Give a one-line status before the first tool call and when the plan or PR mode is decided; keep later notes short and in the same message as the next tool call.
+
 ## Invariants
 
 - Freeze the requested Issue set, repository instructions, target base branch, and exact base SHA before planning.

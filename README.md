@@ -6,8 +6,8 @@
 
 - [`issue-to-pr`](skills/issue-to-pr/SKILL.md): plan one or more same-repository Issues as single, independent, or stacked PRs, then create and verify each PR.
 - [`pr-review`](skills/pr-review/SKILL.md): review one frozen PR head with adaptive risk-driven analysis and verified `COMMENT` publication.
-- [`pr-feedback-triage`](skills/pr-feedback-triage/SKILL.md): reconcile feedback against the latest live head, apply focused fixes, and finish replies/resolutions.
-- [`pr-loop`](skills/pr-loop/SKILL.md): compose those phases across each PR in dependency order until every final base/head snapshot is reviewed and published feedback is reconciled.
+- [`pr-feedback-triage`](skills/pr-feedback-triage/SKILL.md): reconcile feedback and failed current-head CI, apply focused fixes, and finish replies/resolutions.
+- [`pr-loop`](skills/pr-loop/SKILL.md): compose those phases across each PR in dependency order until every final base/head snapshot is reviewed, published feedback is reconciled, and completed CI failures are assessed.
 
 Each standalone skill owns its own mechanics and result contract. The composite skill reuses those procedures without duplicating their policies.
 
@@ -17,7 +17,7 @@ Each standalone skill owns its own mechanics and result contract. The composite 
 flowchart LR
   I[Issue] --> P[issue-to-pr] --> PR[One or more pull requests]
   PR --> R[pr-review<br/>frozen head]
-  R --> F[pr-feedback-triage<br/>latest live state]
+  R --> F[pr-feedback-triage<br/>feedback + current-head CI]
   F --> D{Post-triage state?}
   D -->|head changed| R
   D -->|feedback changed| F
@@ -35,12 +35,13 @@ For an existing pull request, `pr-loop` starts at `pr-review` and handles only t
 - Single writer: at most one repository writer is active during a mutation phase, and GitHub mutations are serialized against validated state.
 - Exact implementation base: `issue-to-pr` pins the target base and each dependent layer's verified parent, and publishes fresh verified PR branches.
 - Frozen-head review: `pr-review` analyzes one immutable snapshot and, when composed, publishes explicitly against that reviewed SHA.
-- Live-head triage: `pr-feedback-triage` follows current head/feedback changes and rejects stale prepared actions before mutation.
+- Live-head triage: `pr-feedback-triage` follows current head/feedback changes, diagnoses completed current-head CI failures, and rejects stale prepared actions before mutation.
 - Model-directed recovery: triage autonomously diagnoses recoverable failures and chooses safe, bounded remediation without relaxing QA or publication gates.
 - Final-head/base review: if triage or stack propagation changes a reviewed head or base, `pr-loop` requires another review of the affected snapshot before success.
 - Fail closed: unsafe repository state, unresolved required QA/publication failures, stale state, exhausted caller limits, missing mandatory capabilities, unresolved actionable feedback, or active `CHANGES_REQUESTED` reviews stop the relevant procedure.
 - No third-party wait: triage published bot/human feedback, but never await pending or running third-party reviews or future comments.
-- Completion is not merge readiness: CI failures, branch protection, and deployment/acceptance checks are reported separately; no protections are bypassed and no merge is implied.
+- CI remediation: completed failed checks are diagnosed and fixed when in scope; pending checks are not polled, and subsequent commits require fresh head-bound checks.
+- Completion is not merge readiness: final-head CI status (passed/failed/pending/unknown), branch protection, and deployment/acceptance checks are reported separately; no protections are bypassed and no merge is implied.
 
 ## Requirements
 

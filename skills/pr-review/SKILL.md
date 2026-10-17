@@ -9,6 +9,13 @@ Review one pull request against one frozen base/head snapshot and publish one ve
 
 This skill is review-only. Do not modify repository files, commits, branches, or PR state except for the requested review feedback. Never approve, request changes, merge, or close unless the user separately asks.
 
+## Working style
+
+- Work through the review end to end without stopping to ask for confirmation. Stop early only for `unsupported`/`failed` conditions or a missing required reference.
+- Report what you found, the evidence behind it, and what you did not verify. Do not pad a clean review or add speculative findings to justify the effort.
+- Do not launch extra review rounds or hardening passes beyond the risk-driven scope below, unless the caller asks for one.
+- Give a one-line status before the first tool call and a short recap in the result.
+
 ## Snapshot and scope
 
 - Resolve a real PR from the request or runtime context; do not substitute an arbitrary local diff.
