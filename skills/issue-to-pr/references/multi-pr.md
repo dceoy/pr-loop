@@ -1,46 +1,28 @@
 # Multi-PR planning and publication
 
-This reference applies when `issue-to-pr` needs more than one PR. Keep the existing single-PR workflow unchanged when one focused PR satisfies the requirements.
+Use this reference only when `issue-to-pr` needs more than one PR. Keep the single-PR procedure unchanged when one cohesive PR satisfies the Issues.
 
-## Select the smallest safe PR graph
+## Plan the smallest safe graph
 
-1. Honor an explicit requirement for multiple PRs, including a requested order or boundaries. If the request names existing PRs, inspect them rather than assuming they are instructions to create duplicates.
-2. Prefer one PR for cohesive changes with a single reviewable responsibility. Do not split merely because a diff is long.
-3. Use independent PRs when changes are logically separate and neither requires the other's commits. Root them all at the same frozen target base.
-4. Use stacked PRs when later changes require earlier commits. A stack is a _linear_ chain of same-repository branches, bottom to top: `main <- model <- api <- integration`. A dependent PR's base must be its immediate parent's branch, not `main`. Do not create a single stack with branching/fan-out dependencies; use separate stacks or reorganize the plan.
-5. A plan may mix independent PRs and stacks. Use a maximum of five PRs by default, unless the caller provides another finite bound. If the request demands more and the bound cannot accommodate it, return `blocked` rather than discard required parts.
+- Honor requested PR boundaries/order; inspect named existing PRs rather than creating duplicates. Do not split solely because a diff is large.
+- Use **independent** PRs for unrelated responsibilities at the same frozen trunk SHA. Use **stacked** PRs for changes dependent on earlier commits: linear same-repository chains such as `main <- model <- API <- integration`, with each PR targeting its immediate predecessor's branch. No fan-out inside a stack; use separate stacks or revise the plan. Mixed graphs are permitted.
+- Default to **at most five PRs**, unless the caller sets another finite limit. If a required split cannot be represented safely, return `blocked` rather than silently combine it.
+- Before edits, freeze Issue identities/material versions, target branch and SHA; record mode, topological order, edges, and per-PR owning Issues, responsibility/interfaces, branch, parent, exact expected base, acceptance/QA checks, and recovery/retry bounds. Each layer must build and be reviewable without unmerged successors. Distinguish parent-relative diffs from cumulative stack changes.
+- If an essential dependency, required split, or acceptance condition remains ambiguous, use the main skill's `STATUS: blocked` question contract.
 
-Before editing, retain an ordered, decision-complete plan that includes:
+## Implement and publish
 
-- Frozen Issue identities and material content versions, target branch and exact base SHA.
-- Mode (`independent`, `stacked`, or `mixed`), ordered PR IDs, and an acyclic dependency graph.
-- Per PR: owning Issues, scoped changes/affected interfaces, expected parent PR, branch name, base ref and expected base commit, implementation/QA/acceptance checks.
-- A verification strategy that distinguishes each PR's parent-relative diff from cumulative stack changes.
-- A recovery strategy and finite bounds for retries. Confirm that every stage can be built, reviewed, and checked independently of future, unmerged stages.
+1. Implement **serially** with one writer in topological order: each root starts at the frozen target SHA and each layer at its **verified parent head**. Confirm its scoped parent-relative diff, Issue requirements, integration with ancestors, and QA.
+2. Before publication, refresh material Issue content, target base, and expected parent heads; replan on material changes. Do not attribute tests from a different commit to the candidate.
+3. Publish every commit through a **new, absent remote ref**, with atomic create-if-absent semantics. Verify exact remote SHA. A preflight absence check is not atomic; never substitute force-push or an implicit stack-command push.
+4. Create and re-fetch each PR, verifying same repository, exact base ref/SHA and head ref/SHA, Issue coverage, and parent relation. Use `Refs #123` for partial Issue coverage, not `Fixes #123` unless that one merged PR closes the Issue.
+5. Prefer GitHub-native stack metadata when **supported and safely available**, but only after refreshing and verifying every planned base/head pair. The stack REST endpoint `POST /repos/{owner}/{repo}/stacks` accepts verified PR numbers in bottom-to-top order; read back membership via `GET /repos/{owner}/{repo}/stacks?pull_request=<number>` or `GET /repos/{owner}/{repo}/stacks/<stack-number>`, asserting exact order and head SHAs. Do **not** use `gh stack link`: it may push branches or retarget PRs. Do not install unrequested extensions or claim native linkage from base/head checks alone. When native API support/verification is absent, retain and label a normal branch-based dependent PR chain.
+6. Re-fetch **all** PRs and verify graph edges, target base, ancestor relations, head SHAs, and complete intended coverage. Return `STATUS: complete` only for the fully verified set.
 
-When an important dependency, acceptance condition, or user-mandated split is ambiguous, use the existing planning `STATUS: blocked` question contract; do not silently choose a materially different scope.
+`gh stack submit --auto --open` is noninteractive but can partially push/update branches. Do not use it when it would violate create-only ref and expected-SHA guarantees.
 
-## Build and publish
+## Partial failures
 
-1. Implement serially in dependency order with one active writer. Every root begins at the frozen target base. Every dependent layer begins at its **verified parent head**; no layer may depend on an unpublished or unexpectedly moved parent.
-2. Keep each commit and parent-relative diff within that PR's planned responsibility. Verify the relevant Issue requirements and QA for each layer, including integration with all its ancestors. Avoid duplicating an ancestor's commits as a new unrelated change.
-3. Before publication, re-fetch the Issues, target base and expected parent heads. Replan on material Issue changes or unexpected base/parent movement. Never claim a successful QA check from a different commit.
-4. Require a fresh, nonexisting remote branch for every generated PR. Create refs using create-if-absent semantics, then read back the exact commit SHA. A preflight absence check **alone** is insufficient: never use a force push or a stack command that may overwrite an unexpected remote branch as a substitute for atomic creation.
-5. Open one PR per planned unit and read it back. Verify same repository, intended base branch and current base SHA, intended head ref/SHA, owning Issues, and dependency relationship. Use `Refs #123` or equivalent for partial Issue coverage; do not use `Fixes #123` on a partial stage, because merging that PR alone must not close the Issue.
-6. Prefer GitHub-native stack metadata when supported by the repository and available noninteractive tooling. Immediately before linking, re-fetch every planned PR and require its repository, base ref/SHA, and head ref/SHA to match the verified chain; stop on any mismatch rather than repairing or retargeting it. Create native metadata with the stack REST API (`POST /repos/{owner}/{repo}/stacks`, with `pull_requests` containing only the verified PR numbers in bottom-to-top order). This endpoint validates the chain without pushing branches or retargeting PRs. Do not use `gh stack link` in this workflow: branch arguments can push branches, and mismatched PR bases can be retargeted automatically. Verify native membership from remote state: query the stack REST API (`GET /repos/{owner}/{repo}/stacks?pull_request=<number>` or `GET /repos/{owner}/{repo}/stacks/<stack-number>`) and assert the exact ordered PR membership and head SHAs. Reading back PR bases and heads alone cannot distinguish a native stack from an ordinary branch-based chain; if native membership cannot be verified, report a branch-based chain instead of native linkage. Do not install extensions/skills unrequested, assume that a public-preview feature is enabled, or treat a successful command without verified remote state as publication. If the stack creation API is unavailable, retain the correctly based dependent PR chain and report that native stack linking was unavailable.
-7. Re-fetch every PR after all publication/linking actions. Verify the full ordered set, target base, ancestor relationships, head SHAs, and absence of omitted/duplicate stages. Only then return `STATUS: complete`.
+Preserve every verified created PR, branch, commit, and its base/head on partial failure. Return `stopped` with URLs, exact unfinished stage, and safe recovery state. For retries, verify prior output, ownership, SHAs, Issue coverage, and graph edges before resuming. Never create duplicate PRs, adopt unrelated branches, silently retarget, delete partially published state, overwrite unexpected refs, merge, auto-merge, close Issues, dismiss reviews, or bypass branch protection.
 
-GitHub `gh stack submit --auto --open` is noninteractive, but submission is not an atomic all-branch operation. It may partially push/update branches. Do not invoke it in a way that violates the fresh-ref and expected-SHA invariants above. Prefer create-only remote refs and linking through supported capabilities, or stop if required guarantees cannot be enforced.
-
-## Partial failures and retries
-
-- Track each branch/commit/PR created and its verified base/head. A failure after some PRs exist returns `stopped` with those exact URLs, refs, and the next unfinished stage, not `complete`.
-- On retry, discover the prior output and verify ownership, exact expected SHAs, Issue coverage, and base/head relationships before resuming. Never create a duplicate PR, adopt an unrelated branch, or rewrite unexpected remote state.
-- Never delete or retarget a partially created PR as implicit cleanup. Require explicit authorization for destructive recovery.
-- Do not merge, auto-merge, close Issues, dismiss reviews, or bypass branch protection.
-
-## Examples
-
-- One Issue asks for model, API, and integration PRs with sequential dependencies: create `model -> api -> integration` as one stack.
-- Multiple Issues describe unrelated CLI and documentation updates: create two independent PRs targeting the frozen trunk.
-- A large Issue cannot be split without breaking compatibility at intermediate layers: keep one PR (or return `blocked` when a user-required split cannot be satisfied safely).
+Examples: dependent model/API/integration stages form one stack; unrelated CLI and documentation changes form independent PRs. An indivisible change stays in one PR unless the caller requires splitting, in which case an unsafe split blocks publication.
