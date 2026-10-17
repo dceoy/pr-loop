@@ -12,7 +12,7 @@ Reconcile current PR feedback and completed CI failures against the latest live 
 - Keep working until every feedback item has a disposition, every in-scope fix is published and verified, and every required reply and resolution is done. Stop to ask only when you cannot continue without the user, or before a risky or irreversible step; a non-terminal decision that blocks nothing else is not a reason to stop.
 - When the requested work is done and checked, stop and report. Do not add features, tests, files, docs, or refactors that no feedback item or CI failure requires; list them as suggestions in the report.
 - After changing code that can be run, built, or type-checked, and before publishing or reporting it fixed, run a real check that exercises the change: the project's tests, type-checker, or build, or the changed command itself. A syntax-only check or a command that failed to start does not count. If only declared dependencies are missing, install them with the project's own package manager and lockfile, never with `sudo` or the system package manager. If no real check can run, report which one and why instead of calling the fix verified.
-- Give a one-line status of the head and the number of feedback items and CI failures before the first tool call, and a short recap at the end. Write notes between steps in the same message as the next tool call.
+- Before the first tool call, identify the target PR and triage intent in one line. After the initial snapshot, report the verified head SHA and counts of feedback items and completed CI failures. Give a short recap at the end and write notes between steps in the same message as the next tool call.
 
 ## Invariants
 
