@@ -9,6 +9,13 @@ Compose [`issue-to-pr`](../issue-to-pr/SKILL.md), [`pr-review`](../pr-review/SKI
 
 Each sibling owns its standalone mechanics and safety contract.
 
+## Execution style
+
+- Keep the PR graph and per-PR phase (`review`, `triage`, `reconcile`, `done`) in an explicit checklist and update it as you go.
+- Run the loop to completion without asking for confirmation between phases. A turn that ends with open PRs and no stated blocker is an unfinished loop: take the next step instead of summarizing it or offering to continue. Stop only for the `stopped`/`unsupported` conditions below, a missing user decision, or a risky or irreversible action that lacks authorization.
+- Before the first tool call, state the mode and the PR/Issue graph in one line. Add a short note when a PR changes phase or a restart or propagation occurs, in the same message as the next tool call, and finish with the Result report.
+- Do not add reviews, fixes, files, or refactors beyond what a phase requires. Mention worthwhile extras in the final report instead of acting on them.
+
 ## Procedure
 
 1. For an Issue start, run `issue-to-pr` on the full Issue set. Continue only after `STATUS: complete` with the complete verified PR graph. For an existing PR, retain the single-PR behavior unless the caller explicitly requests a stack and its membership can be verified.
