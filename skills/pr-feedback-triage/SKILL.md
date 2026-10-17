@@ -63,11 +63,15 @@ precedence; otherwise use head results. Retain head results separately when
 merge results govern, and assess actionable failures on both validated targets.
 See [GitHub's required-check guidance](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks).
 
-Preserve result identifiers, target SHAs, and URLs as evidence. Retain a ledger
+Preserve result identifiers, target SHAs, and URLs as evidence. Retain a private ledger
 of assessed failures keyed by PR head/base and validated merge association,
 actual CI target SHA, and check run ID/attempt or external status context/ID.
-Include unfixable failures and return the ledger and target association to a
-composing caller. A changed base or merge target invalidates prepared CI actions
+Include unfixable failures. Triage owns this ledger and CI reconciliation;
+return the final CI report and target association, not the ledger, to a
+composing caller. Retain private assessment history, attempted remediations,
+and the remaining CI remediation budget across invocations within the same
+overall run; a caller need not interpret or transport failure identities.
+A changed base or merge target invalidates prepared CI actions
 and old assessments even if the PR head is unchanged; refresh the snapshot under
 the existing restart bound before acting. CI is not a review thread and requires
 no reply or resolution.
@@ -124,7 +128,7 @@ still requires a fresh snapshot under the existing bound.
    `expected_head`.
 4. If no fix is needed, set `expected_head` to the analyzed head.
 5. Revalidate `expected_head`, publish required replies, and resolve only eligible threads.
-6. Re-fetch the final head, feedback, base/merge association, and CI results on the validated targets. Restart on unexpected head/feedback or association changes; otherwise finish with the effective CI status and separate head evidence.
+6. Re-fetch the final head, feedback, base/merge association, and CI results on the validated targets. Restart on unexpected head/feedback or association changes. On a stable snapshot, compare completed applicable failures against the private assessment ledger. If any failure identity/attempt is unassessed, return to step 1 for assessment and any in-scope remediation within the CI remediation bound below. Already assessed failures, including unfixable failures and unchanged unsuccessful remediations, do not trigger another pass. Do not wait or poll for pending results. Finish only after every completed failure observed at this final refresh has been assessed, or report the exhausted bound and unassessed failures. Return the effective CI status and separate head evidence.
 
 If fixes already exist before formal triage, refresh the live snapshot and validate those changes against the resulting dispositions instead of failing solely on procedure order.
 
@@ -175,17 +179,22 @@ flowchart TD
   M -->|no, bound permits| A
   M -->|no, exhausted| X
   M -->|yes| N[Reply and resolve eligible threads]
-  N --> O{Final head and feedback match?}
+  N --> O{Final head, feedback and association match?}
   O -->|no, bound permits| A
   O -->|no, exhausted| X
-  O -->|yes| P{Completion blocker?}
+  O -->|yes| C1{Unassessed completed CI failures?}
+  C1 -->|yes, within CI bound| A
+  C1 -->|yes, exhausted| X
+  C1 -->|no| P{Completion blocker?}
   P -->|yes| X
   P -->|no| Q[Complete]
 ```
 
 ## Restart and blockers
 
-The default restart limit is 9 actual restarts after the initial snapshot; a caller/runtime bound may override it. Stop with `limit_exhausted` when the bound is consumed.
+The default restart limit is 9 actual state-change restarts after the initial snapshot; a caller/runtime bound may override it. Stop with `limit_exhausted` when the bound is consumed.
+
+CI remediation re-entries from step 6 have a separate default maximum of 3 per overall run (one invocation when standalone). Preserve this count and the state-change restart count across composed invocations; head, base, merge-target changes, stack propagation, and graph reconciliation do not reset either count. CI state changes alone consume no snapshot restarts. Stop with `limit_exhausted` and report unassessed failures when the CI bound is exhausted; never repeat an unchanged unsuccessful fix.
 
 An active `CHANGES_REQUESTED` review remains `awaiting_re_review` until explicitly dismissed or superseded by a later approval from the same reviewer; `COMMENTED` does not clear it.
 
@@ -201,11 +210,10 @@ Return:
 STATUS: complete | stopped | unsupported
 FINAL_HEAD: <sha> | none
 RESTARTS: <integer>
-CI_HEAD: <PR head sha> | none
 CI_BASE: <base sha> | none
 CI_TEST_MERGE: <validated merge sha> | none
 CI_TARGET: <effective CI target sha> | none
 CI_STATUS: passed | failed | pending | unknown
 ```
 
-Also summarize feedback dispositions, CI findings (with check links and attempted fixes), local QA, replies/resolutions, any attempted recovery, and remaining blockers or required reviewer/user actions.
+`FINAL_HEAD` identifies the head of the final CI snapshot. Also summarize feedback dispositions, CI remediation re-entry count, CI findings (with check links and attempted fixes), local QA, replies/resolutions, any attempted recovery, and remaining blockers or required reviewer/user actions.
