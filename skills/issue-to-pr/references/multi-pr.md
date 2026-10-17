@@ -7,7 +7,7 @@ This reference applies when `issue-to-pr` needs more than one PR. Keep the exist
 1. Honor an explicit requirement for multiple PRs, including a requested order or boundaries. If the request names existing PRs, inspect them rather than assuming they are instructions to create duplicates.
 2. Prefer one PR for cohesive changes with a single reviewable responsibility. Do not split merely because a diff is long.
 3. Use independent PRs when changes are logically separate and neither requires the other's commits. Root them all at the same frozen target base.
-4. Use stacked PRs when later changes require earlier commits. A stack is a *linear* chain of same-repository branches, bottom to top: `main <- model <- api <- integration`. A dependent PR's base must be its immediate parent's branch, not `main`. Do not create a single stack with branching/fan-out dependencies; use separate stacks or reorganize the plan.
+4. Use stacked PRs when later changes require earlier commits. A stack is a _linear_ chain of same-repository branches, bottom to top: `main <- model <- api <- integration`. A dependent PR's base must be its immediate parent's branch, not `main`. Do not create a single stack with branching/fan-out dependencies; use separate stacks or reorganize the plan.
 5. A plan may mix independent PRs and stacks. Use a maximum of five PRs by default, unless the caller provides another finite bound. If the request demands more and the bound cannot accommodate it, return `blocked` rather than discard required parts.
 
 Before editing, retain an ordered, decision-complete plan that includes:
