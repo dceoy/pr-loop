@@ -13,8 +13,8 @@ Keep an explicit PR dependency graph, entry phase (`review` or `triage`), and ph
 
 1. **Resolve graph.** For Issues, run `issue-to-pr` on the complete Issue set and require its verified `STATUS: complete` PR graph. For an existing PR, process only that PR unless a requested stack's membership is verified.
 2. **Choose entry phase.** On each PR's first visit, read all pages of submitted reviews and inline review comments. If any published review or inline feedback exists (including on older heads), start at step 4 (**Triage**); otherwise start at step 3 (**Review**). Pending reviews and review requests do not count. Make this choice only once per PR; subsequent restarts follow reconciliation, not the entry check.
-3. **Review.** In dependency order, freeze each PR's base ref/SHA, head SHA, and published feedback. Run `pr-review` with publication enabled on that exact pair. Require `STATUS: reviewed`, `REVIEWED_HEAD` equal to the frozen head, and an unchanged live base/head after publication.
-4. **Triage.** Run `pr-feedback-triage` on the live PR, including completed head and validated test-merge CI failures. Require `STATUS: complete`; retain its final head, feedback snapshot, and CI report, not its private CI assessment ledger. For dependent PRs, verify the base SHA before triage and again before every triage mutation; if its parent moved, propagate and re-review. If a pre-mutation base check is unavailable, return `unsupported`. After an entry triage, proceed to step 3 to review its resulting live base/head; existing GitHub reviews alone do not verify that exact pair. Keep triage's history and budgets across all invocations.
+3. **Review.** In dependency order, freeze each PR's base ref/SHA, head SHA, and published feedback. Reuse a published `pr-review` only after verifying its persisted `COMMENT` review, commit-bound head SHA, run marker, and explicit reviewed-base SHA marker all match the frozen pair. GitHub reviews without exact-pair evidence cannot be reused. Otherwise run `pr-review` with publication enabled; require `STATUS: reviewed`, `REVIEWED_HEAD` equal to the frozen head, and an unchanged live base/head after publication. Reused reviews do not consume a review round.
+4. **Triage.** Run `pr-feedback-triage` on the live PR, including completed head and validated test-merge CI failures. Require `STATUS: complete`, except on the initial triage-first pass: `STATUS: stopped` may proceed to step 3 **only** if `awaiting_re_review` is the sole remaining blocker and every fix, reply, resolution, required QA, and completed CI failure assessment is verified. Preserve that approval blocker; never treat the exception as completion or bypass a later triage stop. Retain the final head, feedback snapshot, and CI report, not the private CI assessment ledger. For dependent PRs, verify the base SHA before triage and again before every triage mutation; if its parent moved, propagate and re-review. If a pre-mutation base check is unavailable, return `unsupported`. After entry triage, apply step 3 to its resulting live base/head, reusing a verified exact-pair review when available; then run normal triage and reconciliation. Keep triage's history and budgets across all invocations.
 5. **Reconcile.** Re-fetch base/head and all feedback. If either SHA moved, invalidate the review, propagate affected stack changes (step 6), and review again. If only feedback changed, triage again. Otherwise require the latest reviewed base/head to equal the stable triage snapshot.
 6. **Propagate stack changes.** After a lower layer's head changes, update descendants in order via a supported safe stack sync/rebase or explicit expected-SHA updates. Recheck each descendant's base/head, parent-relative diff, and QA; invalidate its previous review. Never silently force-push. Stop on conflicts, unexpected heads, or unavailable safe propagation.
 7. **Final pass.** Re-fetch the entire graph. For each stable reviewed base/head pair, invoke triage once more to refresh final feedback and CI assessment under its existing history and remediation budget, then repeat step 5. Restart at the first invalidated PR when needed, within the bounds below. Complete only after all graph edges, review snapshots, final feedback, and assessed completed CI failures reconcile.
@@ -31,11 +31,14 @@ flowchart TD
   A --> B[Next PR in dependency order]
   B --> Q{First visit with published review feedback?}
   Q -->|yes| T[Initial feedback and CI triage]
-  Q -->|no| C[Freeze base and head; review]
-  T -->|complete| C
-  T -->|stopped| X[Stopped]
-  C --> D[Feedback and CI triage]
-  D --> E{Head and base stable?}
+  Q -->|no or revisit| C{Exact base/head review verified?}
+  T -->|complete or only awaiting re-review| C
+  T -->|other blocker| X[Stopped]
+  C -->|no| R[Review frozen base/head]
+  C -->|yes| D[Feedback and CI triage]
+  R --> D
+  D -->|complete| E{Head and base stable?}
+  D -->|stopped| X
   E -->|no| F{Stack propagation needed?}
   F -->|yes| G[Safely propagate and invalidate descendants]
   G --> B
