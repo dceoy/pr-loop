@@ -14,7 +14,7 @@ Every review has a non-empty top-level body, including a clean review, and conta
 <!-- pr-review-skill-base: <reviewed-base-sha> -->
 ```
 
-Use a new run marker for every invocation so an older review cannot satisfy verification accidentally. The reviewed-base marker records the frozen base commit, not merely the base branch name, so a composing `pr-loop` can safely reuse an exact base/head review on a later run. Reviews without that verified metadata remain valid feedback, but cannot prove reusable review coverage.
+Use a new run marker for every invocation so an older review cannot satisfy verification accidentally. The reviewed-base marker records the frozen base commit, not merely the base branch name, so a composing `pr-loop` can safely reuse an exact base/head review on a later run. Reviews without that verified metadata remain valid feedback, but cannot prove reusable review coverage. These body markers are not authentication: a composing loop must independently establish that the review was posted by a trusted `pr-review` actor (using authenticated runtime identity or verified workflow provenance) before reusing it; if provenance cannot be established, review again.
 
 ## Snapshot rule
 
