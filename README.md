@@ -18,9 +18,12 @@ flowchart LR
   I[Issue] --> P[issue-to-pr] --> PR[One or more pull requests]
   PR --> Q{Published reviews or inline feedback?}
   Q -->|yes| T[Initial pr-feedback-triage]
-  T --> R
-  Q -->|no| R[pr-review<br/>frozen head]
-  R --> F[pr-feedback-triage<br/>feedback + current-head CI]
+  T -->|complete or only awaiting re-review| V{Exact base/head reviewed?}
+  T -->|other blocker| X[Stopped]
+  Q -->|no| V
+  V -->|no| R[pr-review<br/>frozen head]
+  V -->|yes| F[pr-feedback-triage<br/>feedback + current-head CI]
+  R --> F
   F --> D{Post-triage state?}
   D -->|head changed| R
   D -->|feedback changed| F
@@ -31,7 +34,7 @@ flowchart LR
 
 `issue-to-pr` defaults to one PR. It creates independent PRs for unrelated changes or stacked PRs when successive changes depend on earlier ones, including when an Issue explicitly requires multiple PRs. Each stack is a linear chain rooted at the target branch; independent branches remain separate. See [multi-PR behavior](skills/issue-to-pr/references/multi-pr.md).
 
-For an existing pull request with submitted reviews or inline review comments (including feedback on earlier heads), `pr-loop` runs `pr-feedback-triage` first; otherwise it starts at `pr-review`. Initial triage is followed by a review of its resulting base/head, because existing GitHub reviews alone do not establish exact-pair review coverage. The entry decision is made once per PR. Only the requested PR is processed unless a requested stack can be verified. Stacked PR feedback is reconciled bottom-up; changes to a lower layer invalidate affected downstream reviews.
+For an existing pull request with submitted reviews or inline review comments (including feedback on earlier heads), `pr-loop` runs `pr-feedback-triage` first; otherwise it starts at review verification. A published `pr-review` is reused only when its persisted review commit and base/head markers verify the exact current pair; otherwise a new review follows triage. An initial triage stopped **only** by an active `CHANGES_REQUESTED` approval blocker can still proceed to review after all fixes and checks are verified, but cannot report success while approval remains outstanding. The entry decision is made once per PR. Only the requested PR is processed unless a requested stack can be verified. Stacked PR feedback is reconciled bottom-up; changes to a lower layer invalidate affected downstream reviews.
 
 ## Core guarantees
 
