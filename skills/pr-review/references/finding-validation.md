@@ -1,40 +1,24 @@
 # Finding Validation
 
-Discovery proposes hypotheses; validation tries to disprove them before publication.
+Discovery yields hypotheses; **try to disprove each one** before publishing. For each deduplicated candidate, reconstruct changed behavior on the frozen commits, inspect only code necessary to establish reachability/constraints, and look for relevant counterevidence: upstream guards/authn, framework guarantees, tests, prior behavior, retries/cleanup, caller contracts, or unreachable paths.
 
-## Core rule
+Never publish solely because a pattern looks suspicious, violates generic best practice, or has high tool/model confidence.
 
-For each deduplicated candidate, reconstruct the changed behavior on the frozen snapshot, inspect only the surrounding code needed to establish reachability and constraints, search for counterevidence, and decide whether the claimed changed defect and impact are real.
+## Disposition
 
-Do not promote a finding because it matches a suspicious pattern, violates a generic best practice, or has high discovery confidence.
+- `confirmed`: evidence establishes a changed, reachable root cause and credible material impact.
+- `rejected`: a control, counterexample, mistaken assumption, duplicate, pre-existing unrelated behavior, unreachable path, or unsupported impact defeats the claim.
+- `needs-human`: one named external fact remains necessary to resolve material merge risk; use sparingly.
 
-## Counterevidence
+## Evidence gates
 
-Check only what is relevant to the candidate, such as upstream validation, caller guards or authorization, framework guarantees, configuration, tests, retry/cleanup behavior, serialization contracts, prior behavior, or whether the alleged path is actually reachable.
+- **Security:** substantiate source/trust boundary/sink and account for existing protections.
+- **Correctness/reliability:** show a concrete execution/input/state causing wrong results, loss, duplication, leak, or hidden failure.
+- **Tests:** name a material regression the suite would miss.
+- **Performance:** identify a realistic workload, scale, frequency, or lifecycle impact.
+- **Compatibility/docs:** identify the affected external contract or factual documentation mismatch.
+- **Maintainability:** show newly introduced concrete duplication, unnecessary complexity, or speculative flexibility; suggest only minimal KISS/DRY/YAGNI remediation.
 
-A validator should be willing to reject a discovery finding.
+Merge candidate findings sharing one changed root cause; keep distinct independently reachable failures. Rank impact (`critical`, `high`, `medium`, `low`), not confidence; normally suppress `low`.
 
-## Dispositions
-
-- `confirmed`: repository evidence supports a concrete PR-scoped root cause and credible impact with high confidence.
-- `rejected`: a control, incorrect assumption, unreachable path, duplicate root cause, pre-existing unrelated behavior, or unsupported impact makes the candidate unsuitable for publication.
-- `needs-human`: use sparingly when a material merge risk depends on one external fact the repository cannot resolve; name exactly what a human must verify.
-
-## Publication gates
-
-Apply the gate that matches the claim:
-
-- security: establish the relevant trust-boundary/source-control-sink path and account for framework protections;
-- correctness/reliability: identify a concrete input, state, or execution path that produces wrong behavior, loss, duplication, leak, or hidden failure;
-- tests: name the important regression the current suite would fail to detect;
-- performance: identify a credible workload, scale, call-frequency, or lifecycle condition with material impact;
-- compatibility/docs: identify the concrete changed external contract or factual guidance mismatch;
-- maintainability: require concrete complexity, duplication, or speculative flexibility introduced by the PR and keep remediation minimal under KISS/DRY/YAGNI.
-
-## Deduplication and priority
-
-Merge candidates when one changed root cause explains them. Keep separate failures only when independently reachable behavior or contracts require distinct fixes.
-
-Severity expresses impact, not confidence: `critical`, `high`, `medium`, `low`. Normally suppress `low` findings.
-
-A finding is publishable only when it is tied to changed behavior, has a concrete root cause and credible impact, survives relevant counterevidence, has proportional remediation, is accurately located when inline, is not already clearly covered by current feedback, and is strong enough to justify interrupting the author.
+A publishable finding must arise from changed behavior, survive counterevidence, have credible impact and a proportional fix, map accurately to the diff if inline, and not repeat already-addressed feedback. Publish only findings strong enough to interrupt the author.
