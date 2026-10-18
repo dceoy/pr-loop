@@ -20,6 +20,32 @@ Keep an explicit PR dependency graph and phase (`review`, `triage`, `reconcile`,
 
 Do not poll pending/running checks or requested reviews. Triage published feedback, including comments on old heads, against the latest head. Treat feedback arriving after the final snapshot as next-run work. CI changes alone do not require re-review; new head/base or feedback does. A completed CI failure is a triage remediation candidate, not merely a merge-readiness warning.
 
+## Flow
+
+```mermaid
+flowchart TD
+  S{Start} -->|Issues| I[Create verified PR graph]
+  S -->|Existing PR| A[Single PR or verified requested stack]
+  I --> A
+  A --> B[Next PR in dependency order]
+  B --> C[Freeze base and head; review]
+  C --> D[Feedback and CI triage]
+  D --> E{Head and base stable?}
+  E -->|no| F{Stack propagation needed?}
+  F -->|yes| G[Safely propagate and invalidate descendants]
+  G --> B
+  F -->|no| C
+  E -->|yes| K{Feedback stable?}
+  K -->|no| D
+  K -->|yes| H{More PRs?}
+  H -->|yes| B
+  H -->|no| V[Final graph validation; invoke triage for CI refresh]
+  V --> J{Graph and final triage snapshots reconciled?}
+  J -->|no, within bounds| B
+  J -->|no, exhausted| X[Stopped]
+  J -->|yes| Y[Success]
+```
+
 ## Bounds and stopping
 
 Caller/runtime limits override these independent defaults:
