@@ -11,9 +11,10 @@ Every review has a non-empty top-level body, including a clean review, and conta
 ```text
 <!-- pr-review-skill -->
 <!-- pr-review-skill-run: <reviewed-head-sha>-<fresh-UTC-timestamp-and-random-nonce> -->
+<!-- pr-review-skill-base: <reviewed-base-sha> -->
 ```
 
-Use a new marker for every invocation so an older review cannot satisfy verification accidentally.
+Use a new run marker for every invocation so an older review cannot satisfy verification accidentally. The reviewed-base marker records the frozen base commit, not merely the base branch name, so a composing `pr-loop` can safely reuse an exact base/head review on a later run. Reviews without that verified metadata remain valid feedback, but cannot prove reusable review coverage. These body markers are not authentication: a composing loop must independently establish that the review was posted by a trusted `pr-review` actor (using authenticated runtime identity or verified workflow provenance) before reusing it; if provenance cannot be established, review again.
 
 ## Snapshot rule
 
@@ -45,7 +46,7 @@ Do not imply approval or resolution of unrelated existing feedback.
 
 ## Verification
 
-After submission, re-fetch reviews and inline comments. Success requires evidence that the specific current-run COMMENT review persisted, is associated with the frozen reviewed head when GitHub exposes that metadata, contains the intended top-level body and fresh run marker, and includes every intended inline comment at the expected location.
+After submission, re-fetch reviews and inline comments. Success requires evidence that the specific current-run COMMENT review persisted, is associated with the frozen reviewed head when GitHub exposes that metadata, contains the intended top-level body, fresh run marker, and frozen reviewed-base marker, and includes every intended inline comment at the expected location.
 
 A returned review ID is useful but does not replace current-run marker verification. Do not treat process exit status, HTTP success alone, stdout, or the final response as proof of publication.
 

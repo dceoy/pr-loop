@@ -88,19 +88,23 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           baseline="${RUNNER_TEMP}/pr-review-existing-ids"
           marker="<!-- pr-review-skill-run: ${PR_HEAD_SHA}-"
+          base_marker="<!-- pr-review-skill-base: ${PR_BASE_SHA} -->"
           gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews?per_page=100" \
             | jq -r \
                 --arg head "${PR_HEAD_SHA}" \
                 --arg marker "${marker}" \
+                --arg base_marker "${base_marker}" \
                 '.[] |
                  select(.state == "COMMENTED") |
                  select(.commit_id == $head) |
                  select((.body // "") | contains("<!-- pr-review-skill -->")) |
                  select((.body // "") | contains($marker)) |
+                 select((.body // "") | contains($base_marker)) |
                  .id' \
             | sort -u > "${baseline}"
           printf 'path=%s\n' "${baseline}" >> "${GITHUB_OUTPUT}"
@@ -133,6 +137,7 @@ jobs:
           CLAUDE_EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
           GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REVIEW_BASELINE_PATH: ${{ steps.review-baseline.outputs.path }}
         run: |
@@ -152,15 +157,18 @@ jobs:
           fi
           current="${RUNNER_TEMP}/pr-review-current-ids"
           marker="<!-- pr-review-skill-run: ${PR_HEAD_SHA}-"
+          base_marker="<!-- pr-review-skill-base: ${PR_BASE_SHA} -->"
           gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews?per_page=100" \
             | jq -r \
                 --arg head "${PR_HEAD_SHA}" \
                 --arg marker "${marker}" \
+                --arg base_marker "${base_marker}" \
                 '.[] |
                  select(.state == "COMMENTED") |
                  select(.commit_id == $head) |
                  select((.body // "") | contains("<!-- pr-review-skill -->")) |
                  select((.body // "") | contains($marker)) |
+                 select((.body // "") | contains($base_marker)) |
                  .id' \
             | sort -u > "${current}"
 
