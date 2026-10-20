@@ -44,9 +44,9 @@ For an existing pull request with submitted reviews or inline review comments (i
 - Live-head triage: `pr-feedback-triage` follows current head/feedback changes, diagnoses completed current-head CI failures, and rejects stale prepared actions before mutation.
 - Model-directed recovery: triage autonomously diagnoses recoverable failures and chooses safe, bounded remediation without relaxing QA or publication gates.
 - Final-head/base review: if triage or stack propagation changes a reviewed head or base, `pr-loop` requires another review of the affected snapshot before success.
-- Fail closed: unsafe repository state, unresolved required QA/publication failures, stale state, exhausted caller limits, missing mandatory capabilities, unresolved actionable feedback, or active `CHANGES_REQUESTED` reviews stop the relevant procedure.
+- Fail closed: unsafe repository state, unresolved required QA/publication failures, stale state, exhausted mandatory review/reconciliation limits, missing mandatory capabilities, unresolved actionable feedback, or active `CHANGES_REQUESTED` reviews stop the relevant procedure.
 - No third-party wait: triage published bot/human feedback, but never await pending or running third-party reviews or future comments.
-- CI remediation: completed failed checks are diagnosed and fixed when in scope; pending checks are not polled, and subsequent commits require fresh head-bound checks.
+- CI remediation: completed failed checks are diagnosed and fixed when in scope; only selected repaired checks are polled (up to 15 minutes per new head), while unrelated pending checks are not. Each fix requires fresh SHA-bound success or explicit abandonment.
 - Completion is not merge readiness: final-head CI status (passed/failed/pending/unknown), branch protection, and deployment/acceptance checks are reported separately; no protections are bypassed and no merge is implied.
 
 ## Requirements
