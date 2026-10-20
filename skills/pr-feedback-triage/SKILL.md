@@ -98,8 +98,10 @@ flowchart TD
   T1 --> C2{Unassessed completed CI failures?}
   T2 --> C2
   C1 -->|no| C2
-  C2 -->|yes, fix budget remains| A
-  C2 -->|yes, no safe action| T2
+  C2 -->|yes| Z1[Assess new failure and record disposition]
+  Z1 -->|safe fix in budget| A
+  Z1 -->|unfixable or no fix budget| Z2[Record no-fix assessment or abandonment]
+  Z2 --> C2
   C2 -->|no| P{Completion blocker?}
   P -->|yes| X
   P -->|no| Q[Complete]
