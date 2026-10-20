@@ -95,9 +95,9 @@ flowchart TD
   V -->|fresh success| T1[Mark target verified]
   V -->|failed, safe fix in budget| A
   V -->|timeout, unfixable, or exhausted| T2[Abandon target with explicit reason]
-  T1 --> C2{Unassessed completed CI failures?}
-  T2 --> C2
-  C1 -->|no| C2
+  T1 --> C1
+  T2 --> C1
+  C1 -->|no| C2{Unassessed completed CI failures?}
   C2 -->|yes| Z1[Assess new failure and record disposition]
   Z1 -->|safe fix in budget| A
   Z1 -->|unfixable or no fix budget| Z2[Record no-fix assessment or abandonment]
