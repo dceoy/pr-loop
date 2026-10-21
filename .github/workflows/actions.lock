@@ -9,7 +9,6 @@ workflows:
         - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
         - 'anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc'
     '.github/workflows/claude.yml': []
-    '.github/workflows/codeql.yml': []
     '.github/workflows/release.yml':
         - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
 dependencies:
