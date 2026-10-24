@@ -21,8 +21,8 @@ jobs:
     permissions:
       contents: write
       actions: read
-    # Switch to @main after the upstream release workflow PR is merged.
-    uses: dceoy/gha-for-devops/.github/workflows/github-release.yml@feat/reusable-semver-release  # zizmor: ignore[unpinned-uses]
+    # Update this SHA to the upstream merge commit before merging this PR.
+    uses: dceoy/gha-for-devops/.github/workflows/github-release.yml@ea9f8df4f218423d1b5f490bcda0492d93945d86
     with:
       bump: ${{ github.event_name == 'schedule' && 'auto' || inputs.task }}
       required-ci-workflow: ci.yml
