@@ -35,6 +35,6 @@ jobs:
     if: needs.release.outputs.release-tag
     permissions:
       contents: write
-    uses: dceoy/gha-for-devops/.github/workflows/agent-skills-package.yml@main  # zizmor: ignore[unpinned-uses]
+    uses: dceoy/gha-for-devops/.github/workflows/agent-skills-package.yml@eba384516624535a3cdbf5b7689a251749dd0e2e
     with:
       release-tag: ${{ needs.release.outputs.release-tag }}
