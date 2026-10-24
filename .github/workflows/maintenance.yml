@@ -20,13 +20,18 @@ jobs:
     if: github.repository == 'dceoy/pr-loop'
     permissions:
       contents: write
-      actions: read
-      security-events: write
-    # Switch to @main after the upstream reusable-workflow PR is merged.
-    uses: dceoy/gha-for-devops/.github/workflows/github-semver-release.yml@feat/reusable-semver-release  # zizmor: ignore[unpinned-uses]
+    # Switch to @main after the upstream release workflow PR is merged.
+    uses: dceoy/gha-for-devops/.github/workflows/github-release.yml@feat/reusable-semver-release  # zizmor: ignore[unpinned-uses]
     with:
       bump: ${{ github.event_name == 'schedule' && 'auto' || inputs.task }}
       release-paths: |
         skills
         .github/workflows/claude-code-review.yml
-      package-agent-skills: true
+  package-release:
+    needs: release
+    if: needs.release.outputs.release-tag != ''
+    permissions:
+      contents: write
+    uses: dceoy/gha-for-devops/.github/workflows/agent-skills-package.yml@main  # zizmor: ignore[unpinned-uses]
+    with:
+      release-tag: ${{ needs.release.outputs.release-tag }}
