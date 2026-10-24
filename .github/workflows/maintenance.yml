@@ -21,7 +21,7 @@ jobs:
     permissions:
       contents: write
     # Update this SHA to the upstream merge commit before merging this PR.
-    uses: dceoy/gha-for-devops/.github/workflows/github-release.yml@77bc33a958a46fddad2c71364c40dab01ef43268
+    uses: dceoy/gha-for-devops/.github/workflows/github-release.yml@3689377f8fe3305aba36370e055273b0e173e022
     with:
       bump: ${{ github.event_name == 'schedule' && 'auto' || inputs.task }}
       release-paths: |
