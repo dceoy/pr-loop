@@ -20,10 +20,12 @@ jobs:
     if: github.repository == 'dceoy/pr-loop'
     permissions:
       contents: write
+      actions: read
     # Switch to @main after the upstream release workflow PR is merged.
     uses: dceoy/gha-for-devops/.github/workflows/github-release.yml@feat/reusable-semver-release  # zizmor: ignore[unpinned-uses]
     with:
       bump: ${{ github.event_name == 'schedule' && 'auto' || inputs.task }}
+      required-ci-workflow: ci.yml
       release-paths: |
         skills
         .github/workflows/claude-code-review.yml
