@@ -94,6 +94,22 @@ the frozen head, failing the workflow if publication is missing. The client
 agent chooses how to execute optional security discovery; a Skill's presence
 or successful completion is not guaranteed.
 
+## Releases
+
+The repository maintenance workflow runs on Mondays at 09:15 JST, following
+[gha-for-devops maintenance](https://github.com/dceoy/gha-for-devops/blob/main/.github/workflows/maintenance.yml).
+It releases only when `skills/` or the reusable Claude review workflow has
+changed since the latest stable release. Feature or breaking-change commits
+receive a minor version bump; other eligible changes receive a patch bump.
+Run **Actions → Publish GitHub Release** on `main` to request a major, minor,
+or patch release manually.
+
+Release tags are the SemVer source of truth; this private skills repository
+does not publish an npm package. Before publishing, maintenance runs the shared
+GitHub Actions and Markdown checks, revalidates the candidate commit on
+`main`, and uses the shared GitHub Release and agent-skill packaging workflows
+to attach ZIP archives to the release.
+
 ## Usage
 
 ```text

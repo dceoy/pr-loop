@@ -10,8 +10,9 @@ workflows:
         - 'anthropics/claude-code-action@ae68417a745a5df4b2124873632bd73a2255e6f6'
     '.github/workflows/claude.yml': []
     '.github/workflows/codeql.yml': []
-    '.github/workflows/release.yml':
+    '.github/workflows/maintenance.yml':
         - 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
+    '.github/workflows/release.yml': []
 dependencies:
     'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1':
         ref: 'v7.0.1'
