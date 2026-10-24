@@ -20,8 +20,7 @@ jobs:
     if: github.repository == 'dceoy/pr-loop'
     permissions:
       contents: write
-    # Update this SHA to the upstream merge commit before merging this PR.
-    uses: dceoy/gha-for-devops/.github/workflows/github-release.yml@2a17c530551ee52af5a0507b1e426357195dead5
+    uses: dceoy/gha-for-devops/.github/workflows/github-release.yml@eba384516624535a3cdbf5b7689a251749dd0e2e
     with:
       version-bump: ${{ inputs.task || 'auto' }}
       release-trigger-paths: |
