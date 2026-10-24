@@ -1,6 +1,5 @@
 {
   "name": "pr-loop",
-  "version": "1.1.1",
   "private": true,
   "description": "Installable agent skills for the Issue/PR loop",
   "files": [
