@@ -4,5 +4,16 @@
   "description": "Installable agent skills for the Issue/PR loop",
   "files": [
     "skills"
-  ]
+  ],
+  "engines": {
+    "node": ">=22.23.4",
+    "pnpm": ">=12"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": ">=22.23.4",
+      "onFail": "download"
+    }
+  }
 }
