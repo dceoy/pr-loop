@@ -1,84 +1,25 @@
 ---
 name: Publish GitHub Release
 on:
-  workflow_dispatch:
-concurrency:
-  group: github-release-${{ github.repository }}
-  cancel-in-progress: false
+  workflow_dispatch:  # checkov:skip=CKV_GHA_7:Only the release increment is selectable
+    inputs:
+      task:
+        description: Release version increment
+        type: choice
+        required: true
+        default: patch-release
+        options:
+          - major-release
+          - minor-release
+          - patch-release
 permissions:
   contents: read
-defaults:
-  run:
-    shell: bash -euo pipefail {0}
-    working-directory: .
 jobs:
-  prepare-release:
+  maintenance:
     permissions:
       contents: write
-    runs-on: ubuntu-latest
-    outputs:
-      tag: ${{ steps.version.outputs.tag }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Resolve version and create its immutable tag
-        id: version
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if [[ "${GITHUB_REF}" != 'refs/heads/main' ]]; then
-            echo "::error::Releases must be dispatched from the main branch"
-            exit 1
-          fi
-
-          version="$(jq -er '.version | select(type == "string")' package.json)"
-          if [[ ! "${version}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-            echo "::error::package.json version must be a stable semantic version"
-            exit 1
-          fi
-
-          tag="v${version}"
-          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
-          ref_api="repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}"
-          if gh release view "${tag}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
-            # Existing releases may point to older commits; package their tagged source.
-            gh api "${ref_api}" >/dev/null
-            exit 0
-          fi
-
-          if tag_object="$(gh api "${ref_api}" --jq '.object' 2>/dev/null)"; then
-            tag_type="$(jq -r '.type' <<< "${tag_object}")"
-            tag_sha="$(jq -r '.sha' <<< "${tag_object}")"
-            while [[ "${tag_type}" == 'tag' ]]; do
-              tag_object="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_sha}" --jq '.object')"
-              tag_type="$(jq -r '.type' <<< "${tag_object}")"
-              tag_sha="$(jq -r '.sha' <<< "${tag_object}")"
-            done
-            if [[ "${tag_type}" != 'commit' || "${tag_sha}" != "${GITHUB_SHA}" ]]; then
-              echo "::error::${tag} already points to another commit"
-              exit 1
-            fi
-          else
-            gh api "repos/${GITHUB_REPOSITORY}/git/refs" --method POST \
-              -f "ref=refs/tags/${tag}" -f "sha=${GITHUB_SHA}" >/dev/null
-          fi
-  github-release:
-    needs:
-      - prepare-release
-    permissions:
-      contents: write
-    uses: dceoy/gha-for-devops/.github/workflows/github-release.yml@main  # zizmor: ignore[unpinned-uses]
+      actions: read
+      security-events: write
+    uses: ./.github/workflows/maintenance.yml
     with:
-      tag-name: ${{ needs.prepare-release.outputs.tag }}
-      create-new-tag: false
-  package-release:
-    needs:
-      - prepare-release
-      - github-release
-    permissions:
-      contents: write
-    uses: dceoy/gha-for-devops/.github/workflows/agent-skills-package.yml@main  # zizmor: ignore[unpinned-uses]
-    with:
-      release-tag: ${{ needs.prepare-release.outputs.tag }}
+      task: ${{ inputs.task }}
