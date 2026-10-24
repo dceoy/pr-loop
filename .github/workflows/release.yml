@@ -19,7 +19,6 @@ jobs:
     permissions:
       contents: write
       actions: read
-      security-events: write
     uses: $/.github/workflows/maintenance.yml
     with:
       task: ${{ inputs.task }}
