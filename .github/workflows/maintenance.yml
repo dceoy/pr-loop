@@ -22,7 +22,7 @@ jobs:
       contents: write
       actions: read
     # Update this SHA to the upstream merge commit before merging this PR.
-    uses: dceoy/gha-for-devops/.github/workflows/github-release.yml@ea9f8df4f218423d1b5f490bcda0492d93945d86
+    uses: dceoy/gha-for-devops/.github/workflows/github-release.yml@1b0ab6a12df940a65f5bcc23412eb9aeac1c619e
     with:
       bump: ${{ github.event_name == 'schedule' && 'auto' || inputs.task }}
       required-ci-workflow: ci.yml
