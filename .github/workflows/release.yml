@@ -1,6 +1,8 @@
 ---
 name: Publish GitHub Release
 on:
+  schedule:
+    - cron: '15 0 * * 1'  # Mondays 09:15 JST
   workflow_dispatch:  # checkov:skip=CKV_GHA_7:Only the release increment is selectable
     inputs:
       task:
@@ -14,12 +16,25 @@ on:
           - patch-release
 permissions:
   contents: read
+concurrency:
+  group: github-release-${{ github.repository }}
+  cancel-in-progress: false
 jobs:
-  maintenance:
+  release:
+    if: github.repository == 'dceoy/pr-loop'
     permissions:
       contents: write
-      actions: read
-      security-events: write
-    uses: $/.github/workflows/maintenance.yml
+    uses: dceoy/gha-for-devops/.github/workflows/github-release.yml@eba384516624535a3cdbf5b7689a251749dd0e2e
     with:
-      task: ${{ inputs.task }}
+      version-bump: ${{ inputs.task || 'auto' }}
+      release-trigger-paths: |
+        skills
+        .github/workflows/claude-code-review.yml
+  package-release:
+    needs: release
+    if: needs.release.outputs.release-tag
+    permissions:
+      contents: write
+    uses: dceoy/gha-for-devops/.github/workflows/agent-skills-package.yml@eba384516624535a3cdbf5b7689a251749dd0e2e
+    with:
+      release-tag: ${{ needs.release.outputs.release-tag }}

@@ -96,19 +96,20 @@ or successful completion is not guaranteed.
 
 ## Releases
 
-The repository maintenance workflow runs on Mondays at 09:15 JST, following
-[gha-for-devops maintenance](https://github.com/dceoy/gha-for-devops/blob/main/.github/workflows/maintenance.yml).
-It releases only when `skills/` or the reusable Claude review workflow has
-changed since the latest stable release. Feature or breaking-change commits
-receive a minor version bump; other eligible changes receive a patch bump.
-Run **Actions → Publish GitHub Release** on `main` to request a major, minor,
-or patch release manually.
+The [release workflow](.github/workflows/release.yml) runs on Mondays at
+09:15 JST and can also be dispatched manually on `main`. It uses the shared
+[gha-for-devops GitHub Release workflow](https://github.com/dceoy/gha-for-devops/blob/main/.github/workflows/github-release.yml).
+
+Scheduled runs publish only when `skills/` or the reusable Claude review
+workflow has changed since the latest stable release. Feature or breaking-change
+commits receive a minor version bump; other eligible changes receive a patch
+bump. Manual dispatch supports major, minor, or patch releases.
 
 Release tags are the SemVer source of truth; this private skills repository
-does not publish an npm package. Before publishing, maintenance runs the shared
-GitHub Actions and Markdown checks, revalidates the candidate commit on
-`main`, and uses the shared GitHub Release and agent-skill packaging workflows
-to attach ZIP archives to the release.
+does not publish an npm package. The shared release workflow revalidates the
+`main` commit before publishing. When a release tag is emitted, the separate
+agent-skill packaging job attaches ZIP archives to that release. CI checks
+run independently and are not release workflow prerequisites.
 
 ## Usage
 
