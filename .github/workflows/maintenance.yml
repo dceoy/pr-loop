@@ -21,15 +21,15 @@ jobs:
     permissions:
       contents: write
     # Update this SHA to the upstream merge commit before merging this PR.
-    uses: dceoy/gha-for-devops/.github/workflows/github-release.yml@3689377f8fe3305aba36370e055273b0e173e022
+    uses: dceoy/gha-for-devops/.github/workflows/github-release.yml@b8a2753a14c523af66ce933be76cd161b9acbf23
     with:
-      bump: ${{ github.event_name == 'schedule' && 'auto' || inputs.task }}
-      release-paths: |
+      version-bump: ${{ inputs.task || 'auto' }}
+      release-trigger-paths: |
         skills
         .github/workflows/claude-code-review.yml
   package-release:
     needs: release
-    if: needs.release.outputs.release-tag != ''
+    if: needs.release.outputs.release-tag
     permissions:
       contents: write
     uses: dceoy/gha-for-devops/.github/workflows/agent-skills-package.yml@main  # zizmor: ignore[unpinned-uses]
