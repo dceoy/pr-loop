@@ -20,9 +20,8 @@ jobs:
     if: github.repository == 'dceoy/pr-loop'
     permissions:
       contents: write
-      actions: read
     # Update this SHA to the upstream merge commit before merging this PR.
-    uses: dceoy/gha-for-devops/.github/workflows/github-release.yml@1b0ab6a12df940a65f5bcc23412eb9aeac1c619e
+    uses: dceoy/gha-for-devops/.github/workflows/github-release.yml@32540231332dd1e1914a23ff76a89647cba1ab98
     with:
       bump: ${{ github.event_name == 'schedule' && 'auto' || inputs.task }}
       required-ci-workflow: ci.yml
