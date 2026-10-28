@@ -120,6 +120,8 @@ jobs:
             pull_requests: write
             issues: read
             actions: read
+          plugin_marketplaces: https://github.com/anthropics/claude-plugins-official.git
+          plugins: claude-security@claude-plugins-official
           prompt: |
             Invoke the pinned pr-review Skill exactly once for
             ${{ github.repository }}#${{ github.event.pull_request.number }},
