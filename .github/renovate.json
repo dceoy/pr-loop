@@ -1,40 +1,26 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended"
-  ],
+  "extends": ["config:recommended"],
   "minimumReleaseAge": "1 day",
   "packageRules": [
     {
       "description": "Automatically merge minor and patch-level updates",
-      "matchUpdateTypes": [
-        "minor",
-        "patch",
-        "digest"
-      ],
+      "matchUpdateTypes": ["minor", "patch", "digest"],
       "automerge": true,
       "automergeType": "branch"
     },
     {
       "description": "Require review for updates to Claude Security plugin marketplace",
-      "matchDatasources": [
-        "git-refs"
-      ],
-      "matchPackageNames": [
-        "anthropics/claude-plugins-official"
-      ],
-      "automerge": false
+      "matchDatasources": ["git-refs"],
+      "automerge": false,
+      "matchDepNames": ["anthropics/claude-plugins-official"]
     }
   ],
   "customManagers": [
     {
       "customType": "regex",
-      "managerFilePatterns": [
-        "/^\\.github\\/workflows\\/claude-code-review\\.yml$/"
-      ],
-      "matchStrings": [
-        "repository: anthropics/claude-plugins-official\\s+ref: (?<currentDigest>[a-f0-9]{40})"
-      ],
+      "managerFilePatterns": ["/^\\.github\\/workflows\\/claude-code-review\\.yml$/"],
+      "matchStrings": ["repository: anthropics/claude-plugins-official\\s+ref: (?<currentDigest>[a-f0-9]{40})"],
       "depNameTemplate": "anthropics/claude-plugins-official",
       "packageNameTemplate": "https://github.com/anthropics/claude-plugins-official",
       "datasourceTemplate": "git-refs",
