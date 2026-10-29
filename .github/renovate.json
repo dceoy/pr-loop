@@ -13,6 +13,7 @@
       "description": "Require review for updates to Claude Security plugin marketplace",
       "matchDatasources": ["git-refs"],
       "automerge": false,
+      "minimumReleaseAge": null,
       "matchDepNames": ["anthropics/claude-plugins-official"]
     }
   ],
