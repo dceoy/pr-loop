@@ -108,6 +108,13 @@ jobs:
                  .id' \
             | sort -u > "${baseline}"
           printf 'path=%s\n' "${baseline}" >> "${GITHUB_OUTPUT}"
+      - name: Checkout pinned Claude Security plugin marketplace
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          repository: anthropics/claude-plugins-official
+          ref: f8c5e7a1dcb71b10cb74586224b5401f3de5db28
+          path: .claude-plugins-official
+          persist-credentials: false
       - name: Run comprehensive PR review
         id: claude-review
         env:
@@ -120,6 +127,8 @@ jobs:
             pull_requests: write
             issues: read
             actions: read
+          plugin_marketplaces: ./.claude-plugins-official
+          plugins: claude-security@claude-plugins-official
           prompt: |
             Invoke the pinned pr-review Skill exactly once for
             ${{ github.repository }}#${{ github.event.pull_request.number }},
