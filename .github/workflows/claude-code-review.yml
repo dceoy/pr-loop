@@ -127,8 +127,6 @@ jobs:
             pull_requests: write
             issues: read
             actions: read
-          plugin_marketplaces: ./.claude-plugins-official
-          plugins: claude-security@claude-plugins-official
           prompt: |
             Invoke the pinned pr-review Skill exactly once for
             ${{ github.repository }}#${{ github.event.pull_request.number }},
@@ -138,7 +136,7 @@ jobs:
             exactly one verified COMMENT review on the frozen head, including
             a clean result when no findings remain. Do not modify files.
             If the review cannot complete, report the Skill's terminal status.
-          claude_args: ${{ format('{0} --permission-mode=auto', inputs.claude-args) }}
+          claude_args: ${{ format('{0} --permission-mode=auto --plugin-dir=./.claude-plugins-official/plugins/claude-security', inputs.claude-args) }}
       - name: Verify pr-review invocation and COMMENT publication
         id: verify-review
         if: steps.claude-review.outcome == 'success'
