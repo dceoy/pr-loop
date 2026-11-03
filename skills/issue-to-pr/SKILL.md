@@ -32,7 +32,7 @@ For multi-PR plans, read and follow [references/multi-pr.md](references/multi-pr
 
 ## Planning
 
-A ready plan must be decision-complete: scope, affected interfaces, implementation decisions, constraints, and verification. Decide `single`, `independent`, `stacked`, or `mixed` before editing. For each planned PR, record the owning Issues, responsibility, branch, parent PR (if any), expected base, and QA. Require a topological order and an explicit cap on PR count (default 5; caller may override). If an explicit split cannot be represented safely within that bound, stop rather than silently consolidate it.
+A ready plan must be decision-complete: scope, affected interfaces, implementation decisions, constraints, and verification. Decide `single`, `independent`, `stacked`, or `mixed` before editing. For each planned PR, record the owning Issues, responsibility, branch, parent PR (if any), expected base, and QA. Require a topological order and an explicit cap on PR count (default 5; caller may override). If an explicit split cannot be represented safely within that bound, return `STATUS: blocked` (below) rather than silently consolidate it.
 
 If one material decision is missing, return only:
 
@@ -73,6 +73,6 @@ flowchart TD
 
 ## Result
 
-Return `STATUS: complete | stopped | unsupported`.
+Return `STATUS: complete | stopped | unsupported`, or the `STATUS: blocked` form above when a material decision is missing.
 
 On success include the Issues, target base SHA, mode, ordered PR list (URL, base ref/SHA, head ref/SHA, parent, per-PR QA), and native-stack linkage status. In single-PR mode also retain the legacy `PR` and `PR head SHA` fields. On failure include the blocker, verified partial PRs/refs, and exact safe recovery or required user decision.
