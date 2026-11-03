@@ -24,7 +24,7 @@ jobs:
     if: github.repository == 'dceoy/pr-loop'
     permissions:
       contents: write
-    uses: dceoy/gha-for-devops/.github/workflows/github-release.yml@664463f91334a5030111bfab0a999be23230edca
+    uses: dceoy/gha-for-devops/.github/workflows/github-release.yml@d0c92a28069d18ee102c355b31c248f65aeb66d0
     with:
       version-bump: ${{ inputs.task || 'auto' }}
       release-trigger-paths: |
@@ -35,6 +35,6 @@ jobs:
     if: needs.release.outputs.release-tag
     permissions:
       contents: write
-    uses: dceoy/gha-for-devops/.github/workflows/agent-skills-package.yml@664463f91334a5030111bfab0a999be23230edca
+    uses: dceoy/gha-for-devops/.github/workflows/agent-skills-package.yml@d0c92a28069d18ee102c355b31c248f65aeb66d0
     with:
       release-tag: ${{ needs.release.outputs.release-tag }}
