@@ -67,7 +67,7 @@ jobs:
       pull-requests: write
       id-token: write
       actions: read
-    uses: dceoy/pr-loop/.github/workflows/claude-code-review.yml@main
+    uses: dceoy/pr-loop/.github/workflows/claude-code-review.yml@66193c0383663b48ea144b438d7dd4a42e02b6e2  # v1.1.5
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
