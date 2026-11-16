@@ -75,4 +75,4 @@ flowchart TD
 
 Return `STATUS: complete | stopped | unsupported`, or the `STATUS: blocked` form above when a material decision is missing.
 
-On success include the Issues, target base SHA, mode, ordered PR list (URL, base ref/SHA, head ref/SHA, parent, per-PR QA), and native-stack linkage status. In single-PR mode also retain the legacy `PR` and `PR head SHA` fields. On failure include the blocker, verified partial PRs/refs, and exact safe recovery or required user decision.
+On success include the Issues, target base SHA, mode, ordered PR list (URL, base ref/SHA, head ref/SHA, parent, per-PR QA), and native-stack linkage status. In single-PR mode also report top-level `PR` and `PR head SHA` fields. On failure include the blocker, verified partial PRs/refs, and exact safe recovery or required user decision.
