@@ -15,8 +15,7 @@ on:
     types:
       - published
   workflow_dispatch:
-permissions:
-  contents: read
+permissions: {}
 jobs:
   package:
     permissions:

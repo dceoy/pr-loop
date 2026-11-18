@@ -14,8 +14,7 @@ on:
           - major-release
           - minor-release
           - patch-release
-permissions:
-  contents: read
+permissions: {}
 concurrency:
   group: github-release-${{ github.repository }}
   cancel-in-progress: false

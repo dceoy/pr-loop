@@ -28,11 +28,7 @@ on:
       GH_TOKEN:
         required: false
         description: Optional GitHub token for checkout
-permissions:
-  contents: read
-  pull-requests: write
-  id-token: write
-  actions: read
+permissions: {}
 concurrency:
   group: claude-code-review-${{ github.repository }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
@@ -42,6 +38,11 @@ defaults:
     working-directory: .
 jobs:
   claude-code-review:
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+      actions: read
     if: >
       github.event_name == 'pull_request'
       && (! github.event.pull_request.draft)
