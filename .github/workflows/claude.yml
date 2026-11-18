@@ -10,8 +10,7 @@ on:
     paths-ignore:
       - .github/workflows/claude.yml
       - .github/workflows/claude-code-review.yml
-permissions:
-  contents: read
+permissions: {}
 jobs:
   claude-code-review:
     if: >

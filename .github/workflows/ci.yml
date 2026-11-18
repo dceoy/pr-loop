@@ -12,8 +12,7 @@ on:
       - synchronize
       - reopened
   workflow_dispatch:
-permissions:
-  contents: read
+permissions: {}
 defaults:
   run:
     shell: bash -euo pipefail {0}
