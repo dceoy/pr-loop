@@ -1,6 +1,6 @@
 ---
 name: pr-review
-description: Review a GitHub pull request with risk-driven analysis, optional built-in or third-party security-review Skills, and one verified COMMENT review by default.
+description: Review a GitHub pull request with risk-driven analysis, optional built-in or third-party security review skills, and one verified COMMENT review by default.
 ---
 
 # PR Review
@@ -14,7 +14,7 @@ Review one PR against one frozen base/head pair and publish **one verified `COMM
 - Publish unless `dry-run` or `no-post` was requested. For a composed review, independently validate and deduplicate caller-supplied findings; do not trust their conclusions.
 - Complete the requested review without unnecessary extra rounds. Report confirmed findings and supporting evidence, and state material limitations; do not pad a clean review with speculative defects. Announce the target before the first tool call.
 
-## Optional security-review Skill
+## Optional security review skill
 
 When available, run **at most one** suitable built-in or third-party Skill for PR/diff security discovery, using the runtime's supported invocation method. The review must not depend on a provider, particular agent, or installation.
 
@@ -46,7 +46,7 @@ flowchart TD
   P -->|no| U[Unsupported]
   P -->|yes| D
   C -->|no| D
-  D --> S{Usable security-review Skill available?}
+  D --> S{Usable security review skill available?}
   S -->|yes| T[Run scoped security discovery]
   S -->|no| E[Discover general candidates]
   T --> E

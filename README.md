@@ -75,12 +75,12 @@ jobs:
 
 The reusable workflow runs a **single Claude Code Action**, invoking the pinned
 `pr-review` skill once for a frozen pull request head. `pr-review` looks for an
-already available security-review skill, either built-in or third-party. It may
+already available security review skill, either built-in or third-party. It may
 invoke one compatible skill as optional supplemental discovery, then validates
 and deduplicates any findings before publishing a single verified GitHub
 `COMMENT` review.
 
-If no suitable security-review skill is available, or the runtime cannot invoke
+If no suitable security review skill is available, or the runtime cannot invoke
 one, `pr-review` continues on its own (including its normal security review
 lens). It does not install additional security skills or represent a skipped
 scan as completed. When an invoked scan fails, `pr-review` follows its
