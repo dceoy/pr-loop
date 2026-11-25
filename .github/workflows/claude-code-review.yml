@@ -134,7 +134,7 @@ jobs:
             ${{ github.repository }}#${{ github.event.pull_request.number }},
             base ${{ github.event.pull_request.base.sha }},
             head ${{ github.event.pull_request.head.sha }}.
-            Follow the Skill's optional security review policy and publish
+            Follow the Skill's optional security-review policy and publish
             exactly one verified COMMENT review on the frozen head, including
             a clean result when no findings remain. Do not modify files.
             If the review cannot complete, report the Skill's terminal status.
