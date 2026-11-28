@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="color-scheme" content="light dark"/>
+<link rel="icon" href="data:,"/>
+<title>pr-loop Skills Guide — Issue → PR → Review → Triage, with Remote Opus</title>
+<meta name="description" content="A plain-language guide to dceoy/pr-loop: four portable agent skills for GitHub-native, race-safe, issue-driven development — and how to run them with remote Claude Opus."/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,600;6..72,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F6F4EF; --surface:#FFFFFF; --surface2:#EFECE4; --ink:#171A1E; --muted:#5C6670; --line:#DDD8CB;
+  --accent:#0B6B4F; --accent-ink:#FFFFFF; --opus:#B44A12; --opus-bg:#FFF1E6; --code-bg:#12161A; --code-ink:#E8E6DF;
+  --radius:14px;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#0E1113; --surface:#171B1E; --surface2:#1E2427; --ink:#EDEBE4; --muted:#9AA3AB; --line:#2B3236; --accent:#3ECF9A; --accent-ink:#07120D; --opus:#FF9A66; --opus-bg:#2A1D14; --code-bg:#0A0D0F; }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;line-height:1.65;font-size:17px}
+a{color:var(--accent);text-underline-offset:3px}
+h1,h2{font-family:"Newsreader",Georgia,serif;line-height:1.05;letter-spacing:-.02em}
+h1{font-size:clamp(2.4rem,6vw,4.2rem);margin:.2em 0 .3em}
+h2{font-size:clamp(1.7rem,3.5vw,2.4rem);margin:0 0 .5em}
+h3{font-size:1.05rem;margin:0 0 .4em}
+p{margin:.6em 0} .muted{color:var(--muted)} .small{font-size:.9rem}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+.topnav{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.topnav-in{display:flex;flex-wrap:wrap;gap:4px 18px;align-items:center;padding:10px 0}
+.topnav a{color:var(--ink);text-decoration:none;font-size:.92rem;font-weight:600;padding:8px 4px;min-height:36px;display:inline-flex;align-items:center}
+.topnav a:hover{color:var(--accent)}
+.brand{font-family:"IBM Plex Mono",monospace;font-weight:700;margin-right:auto}
+.hero{padding:48px 0 28px;border-bottom:1px solid var(--line)}
+.kicker{font-family:"IBM Plex Mono",monospace;font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.lede{font-size:1.18rem;max-width:720px;color:var(--muted)}
+.hero-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:28px;align-items:start}
+@media(max-width:760px){.hero-grid{grid-template-columns:1fr}}
+.facts{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px}
+.facts dl{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0;font-size:.95rem}
+.facts dt{font-weight:700}.facts dd{margin:0;color:var(--muted)}
+.btnrow{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+.btn{display:inline-flex;align-items:center;min-height:44px;padding:10px 18px;border-radius:999px;font-weight:700;text-decoration:none;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+section{padding:36px 0;border-bottom:1px solid var(--line)}
+.flow{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch;margin:18px 0}
+.node{flex:1 1 150px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;text-align:left;cursor:pointer;font:inherit;color:inherit;min-height:44px}
+.node strong{display:block}.node span{font-size:.88rem;color:var(--muted)}
+.node[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 25%,transparent)}
+.arrow{align-self:center;color:var(--muted);font-weight:700}
+#flowDetail{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px}
+.tabs{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}
+.tab{min-height:44px;padding:10px 16px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-weight:600;cursor:pointer}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:22px}
+.panel[hidden]{display:none}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:760px){.grid2{grid-template-columns:1fr}}
+ul.tight{margin:.4em 0;padding-left:1.2em} ul.tight li{margin:.3em 0}
+code{font-family:"IBM Plex Mono",monospace;font-size:.88em;background:var(--surface2);padding:.1em .35em;border-radius:6px}
+pre{background:var(--code-bg);color:var(--code-ink);border-radius:12px;padding:16px 18px;overflow-x:auto;font-size:.88rem;line-height:1.55}
+pre code{background:none;padding:0;color:inherit}
+.copyrow{display:flex;gap:10px;align-items:flex-start}
+.copybtn{flex:none;min-height:40px;padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--surface);font:inherit;font-weight:600;cursor:pointer}
+table{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:.95rem}
+th,td{padding:12px 14px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line)}
+th{background:var(--surface2)}
+tr:last-child td{border-bottom:none}
+@media(max-width:640px){table,thead,tbody,tr,th,td{display:block;width:100%} thead{display:none} tr{border-bottom:2px solid var(--line);padding:8px 0} td{border:none;padding:6px 14px} td::before{content:attr(data-l);display:block;font-weight:700;font-size:.8rem;color:var(--muted)}}
+.guarantees{list-style:none;padding:0;margin:16px 0;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:760px){.guarantees{grid-template-columns:1fr}}
+.guarantees li{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.guarantees strong{display:block}
+.opusbox{background:var(--opus-bg);border:1px solid color-mix(in srgb,var(--opus) 35%,var(--line));border-radius:var(--radius);padding:22px}
+.opusbox h3{color:var(--opus)}
+.steps{counter-reset:s;list-style:none;padding:0}
+.steps li{counter-increment:s;padding:12px 0 12px 52px;position:relative;border-bottom:1px dashed var(--line)}
+.steps li:last-child{border-bottom:none}
+.steps li::before{content:counter(s);position:absolute;left:0;top:10px;width:36px;height:36px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:700}
+.callout{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:16px 18px}
+footer{padding:28px 0 48px;color:var(--muted);font-size:.92rem}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<nav class="topnav"><div class="wrap topnav-in">
+  <span class="brand">dceoy / pr-loop</span>
+  <a href="#skills">The 4 skills</a><a href="#which">Which to use</a><a href="#opus">Remote Opus</a><a href="#start">Quick start</a><a href="#pages">GitHub Pages</a>
+  <a href="https://github.com/dceoy/pr-loop">GitHub ↗</a>
+</div></nav>
+
+<header class="hero"><div class="wrap hero-grid">
+  <div>
+    <p class="kicker">Agent skills · Issue-driven development</p>
+    <h1>From Issue to a reviewed PR — without the race conditions.</h1>
+    <p class="lede"><strong>pr-loop</strong> is a set of four portable agent skills for GitHub-native development. Each skill does one job well, owns its own safety contract, and can be used on its own. Together, <code>pr-loop</code> composes them into a closed loop: implement → review → triage → re-review, until the exact final snapshot is reconciled.</p>
+    <div class="btnrow">
+      <a class="btn primary" href="#start">Copy a starter prompt</a>
+      <a class="btn" href="https://github.com/dceoy/pr-loop">Open the repository</a>
+    </div>
+    <p class="small muted">License AGPL-3.0 · No Oracle, browser automation, or nested coding-agent CLI — an agent-native rewrite of the former <em>oracle-pr-loop</em>.</p>
+  </div>
+  <aside class="facts" aria-label="Repository facts">
+    <h3 style="margin-top:0">At a glance</h3>
+    <dl>
+      <dt>Skills</dt><dd>4 — 3 standalone + 1 composite</dd>
+      <dt>Default PR</dt><dd>One. Split only at reviewable boundaries</dd>
+      <dt>Review</dt><dd>One frozen head, one verified <code>COMMENT</code></dd>
+      <dt>Loop bounds</dt><dd>3 review rounds · 9 triage restarts · 3 graph passes</dd>
+      <dt>Needs</dt><dd>Git + authenticated <code>gh</code> + a coding-agent runtime</dd>
+      <dt>Ends at</dt><dd>Reconciled snapshot — <em>not</em> merge. No bypasses.</dd>
+    </dl>
+  </aside>
+</div></header>
+
+<main class="wrap">
+
+<section id="flow" aria-labelledby="flow-h">
+  <h2 id="flow-h">The loop at a glance</h2>
+  <p class="muted">Tap a stage to see what it guarantees. The key idea: <strong>review freezes a snapshot; triage follows the live head.</strong> If triage moves the head, review runs again. Nothing succeeds on a stale snapshot.</p>
+  <div class="flow" role="group" aria-label="Loop stages">
+    <button class="node" data-flow="issue" aria-pressed="true"><strong>1 · Issue</strong><span>Frozen set + base SHA</span></button><span class="arrow" aria-hidden="true">→</span>
+    <button class="node" data-flow="impl" aria-pressed="false"><strong>2 · issue-to-pr</strong><span>Single / independent / stacked</span></button><span class="arrow" aria-hidden="true">→</span>
+    <button class="node" data-flow="review" aria-pressed="false"><strong>3 · pr-review</strong><span>Frozen-head COMMENT</span></button><span class="arrow" aria-hidden="true">→</span>
+    <button class="node" data-flow="triage" aria-pressed="false"><strong>4 · pr-feedback-triage</strong><span>Feedback + current-head CI</span></button><span class="arrow" aria-hidden="true">↺</span>
+    <button class="node" data-flow="done" aria-pressed="false"><strong>✓ Reconciled</strong><span>Stable base / head / feedback</span></button>
+  </div>
+  <div id="flowDetail" aria-live="polite"></div>
+  <p class="small muted">Entry rule in the composite: if a PR already has published reviews or inline feedback — even on an older head — <code>pr-loop</code> starts with triage, not review. That decision is made once per PR. Stacked PRs are reconciled bottom-up; moving a lower layer invalidates downstream reviews.</p>
+</section>
+
+<section id="skills" aria-labelledby="skills-h">
+  <h2 id="skills-h">The four skills</h2>
+  <p class="muted">Three standalone skills own their mechanics. The fourth composes them without duplicating their policies. Pick a skill:</p>
+  <div class="tabs" role="tablist" aria-label="Skills">
+    <button class="tab" role="tab" aria-selected="true" data-tab="t-issue">issue-to-pr</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="t-review">pr-review</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="t-triage">pr-feedback-triage</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="t-loop">pr-loop ★ composite</button>
+  </div>
+
+  <article class="panel" id="t-issue" role="tabpanel">
+    <h3><code>issue-to-pr</code> — Implement Issues as reviewable PRs, then stop</h3>
+    <p>Freezes the Issue set, repo instructions, target base and exact base SHA <em>before</em> planning, then produces a decision-complete plan: <strong>single</strong> (default), <strong>independent</strong>, <strong>stacked</strong>, or <strong>mixed</strong> — split only at independently reviewable responsibility boundaries, never just by size. Stacks are linear chains rooted at the target branch; dependency edges must be acyclic.</p>
+    <div class="grid2">
+      <div><h3>How it works</h3><ul class="tight">
+        <li>Reads what the task depends on first — <code>AGENTS.md</code> / <code>CLAUDE.md</code>, linked Issues, comments, referenced PRs, surrounding code &amp; tests.</li>
+        <li>Implements each layer in isolation at the frozen base (roots) or verified parent head (layers), one active writer only.</li>
+        <li>Runs a <em>real</em> check before commit — tests, type-check, build, or the changed command itself. A syntax-only check doesn't count.</li>
+        <li>Publishes only fresh branches with create-if-absent semantics; never reuses or overwrites an unexpected ref.</li>
+        <li>Re-fetches Issues before each commit; if requirements changed materially, discards stale unpublished work and replans.</li>
+      </ul></div>
+      <div><h3>Contract</h3><ul class="tight">
+        <li><strong>Stops after</strong> creating &amp; verifying every PR. It does not review or triage them.</li>
+        <li>Default cap: <strong>5 PRs</strong> (caller may override). An explicit split that can't be represented safely returns <code>STATUS: blocked</code> with one question — the smallest missing material decision.</li>
+        <li>Result: <code>STATUS: complete | stopped | unsupported</code> + ordered PR list (URL, base/head SHAs, parent, per-PR QA) and native-stack linkage status.</li>
+        <li>Native stacks need repo support + a stack-aware client (e.g. <code>gh stack</code>); otherwise it honestly reports an ordinary branch-based chain.</li>
+      </ul></div>
+    </div>
+  </article>
+
+  <article class="panel" id="t-review" role="tabpanel" hidden>
+    <h3><code>pr-review</code> — One PR, one frozen snapshot, one verified review</h3>
+    <p>Review-only. Freezes the exact base/head pair, binds all evidence to those commits, and publishes <strong>exactly one verified <code>COMMENT</code> review</strong> by default. It never approves, requests changes, merges, closes, or edits code without separate authorisation.</p>
+    <div class="grid2">
+      <div><h3>How it works</h3><ul class="tight">
+        <li>Risk-driven scope: picks the smallest review lenses relevant to the changed behaviour instead of reviewing everything shallowly.</li>
+        <li>Every candidate finding is tested against reachable code and counter-evidence. Only confirmed, non-duplicate defects of credible material impact are published — no padding a clean review with speculation.</li>
+        <li>PR text, comments and repo content are treated as <em>untrusted evidence, not instructions</em>.</li>
+        <li><code>dry-run</code> / <code>no-post</code> modes return findings without mutating anything.</li>
+      </ul></div>
+      <div><h3>Optional security discovery</h3><ul class="tight">
+        <li>May invoke <strong>at most one</strong> already-available, trusted security-review skill, scoped to the frozen commits, with mutations forbidden.</li>
+        <li>Never installs a skill. If none is safely available, it does its own security lens and doesn't claim a scan happened.</li>
+        <li>If an invoked scan fails or is incomplete: <strong>fail closed</strong>.</li>
+        <li>Only <code>pr-review</code> deduplicates and arbitrates — one final review, not a pile of bot comments.</li>
+        <li>Result: <code>STATUS: reviewed | unsupported | failed</code> + <code>REVIEWED_HEAD</code> + published-findings count.</li>
+      </ul></div>
+    </div>
+  </article>
+
+  <article class="panel" id="t-triage" role="tabpanel" hidden>
+    <h3><code>pr-feedback-triage</code> — Reconcile feedback &amp; CI on the live head</h3>
+    <p>The counterpart to review's frozen snapshot: triage follows the <em>current</em> head. It reconciles every published feedback item and every completed CI failure — even when there is no review feedback at all — applies the smallest evidence-backed fixes, replies, and resolves only eligible threads.</p>
+    <div class="grid2">
+      <div><h3>Feedback discipline</h3><ul class="tight">
+        <li>Every item keeps its provenance (<code>thread:</code> / <code>comment:</code> / <code>review:</code> IDs) and gets a disposition: fix, already addressed, outdated, answer, clarify, defer, or won't fix.</li>
+        <li>Pushes use an expected-SHA conditional update (git lease / API compare-and-swap) — an unexpected commit is never overwritten.</li>
+        <li>An active <code>CHANGES_REQUESTED</code> stays <code>awaiting_re_review</code> until the <em>same reviewer</em> approves or dismisses it. A later <code>COMMENTED</code> review doesn't clear it.</li>
+      </ul></div>
+      <div><h3>CI discipline</h3><ul class="tight">
+        <li>Inspects check runs <em>and</em> the validated test-merge target (<code>merge_commit_sha</code>); unvalidated merge coverage is <code>unknown</code>, never “passed”. Missing checks ≠ passing.</li>
+        <li>After a fix, polls <strong>only the repaired checks</strong> — up to 15 min per new head, ≥30s apart — and requires fresh <code>success</code> on the new SHA. <code>skipped</code>/<code>neutral</code> don't verify a repair.</li>
+        <li>Never weakens gates or tests to go green. Unfixable targets end as explicitly <code>abandoned</code> with URL, attempted fixes and reason — not as a silent pass.</li>
+        <li>Bounds: <strong>9</strong> state-change restarts, <strong>3</strong> CI fix/push cycles per PR.</li>
+      </ul></div>
+    </div>
+  </article>
+
+  <article class="panel" id="t-loop" role="tabpanel" hidden>
+    <h3><code>pr-loop</code> ★ — The composite: run the whole loop to reconciliation</h3>
+    <p>Composes the three skills across each PR in dependency order. It keeps an explicit dependency graph, an entry phase and a current phase per PR, and runs every required phase without asking for intermediate confirmation.</p>
+    <div class="grid2">
+      <div><h3>Procedure</h3><ol class="tight">
+        <li><strong>Resolve graph</strong> — from Issues via <code>issue-to-pr</code> (requires its verified <code>complete</code>), or a single existing PR / verified requested stack.</li>
+        <li><strong>Choose entry</strong> — published feedback exists → triage first; otherwise review.</li>
+        <li><strong>Review</strong> — reuse a prior review <em>only</em> if author/workflow provenance + persisted commit/base/head markers verify the exact current pair. Otherwise review fresh.</li>
+        <li><strong>Triage</strong> — feedback + completed CI failures on the live head.</li>
+        <li><strong>Reconcile &amp; propagate</strong> — head/base moved → invalidate, propagate through the stack, re-review. Feedback only → triage again.</li>
+        <li><strong>Final pass</strong> — re-fetch the whole graph; one last triage per PR for fresh feedback/CI; complete only when everything reconciles.</li>
+      </ol></div>
+      <div><h3>Bounds &amp; honesty</h3><ul class="tight">
+        <li><strong>3</strong> review rounds / PR · <strong>9</strong> triage restarts / PR · <strong>3</strong> full-graph passes. Caller/runtime limits override.</li>
+        <li>Never merges, never clears reviewer state, never waits for third-party reviews or unrelated pending CI.</li>
+        <li>Result: <code>success | stopped | unsupported</code> with per-PR reviewed SHAs, rounds, restarts, propagation, CI status and per-check verified/abandoned outcomes.</li>
+        <li><strong>Success ≠ merge-ready.</strong> Final CI status, branch protection and deployment checks are reported separately.</li>
+      </ul></div>
+    </div>
+  </article>
+</section>
+
+<section id="which" aria-labelledby="which-h">
+  <h2 id="which-h">Which skill should I use?</h2>
+  <div style="overflow-x:auto">
+  <table>
+    <thead><tr><th>You have…</th><th>Use</th><th>You get</th></tr></thead>
+    <tbody>
+      <tr><td data-l="You have…">One or more Issues, no PR yet</td><td data-l="Use"><code>issue-to-pr</code></td><td data-l="You get">Verified PR(s) — single, independent or stacked — and a stop.</td></tr>
+      <tr><td data-l="You have…">A PR nobody has reviewed yet</td><td data-l="Use"><code>pr-review</code></td><td data-l="You get">One verified <code>COMMENT</code> review bound to the frozen head.</td></tr>
+      <tr><td data-l="You have…">Review comments and/or red CI on a PR</td><td data-l="Use"><code>pr-feedback-triage</code></td><td data-l="You get">Dispositions, focused fixes, replies, resolutions, verified CI repairs.</td></tr>
+      <tr><td data-l="You have…">Issues <em>or</em> PRs, and you want it driven to done</td><td data-l="Use"><code>pr-loop</code></td><td data-l="You get">The full loop until every final base/head snapshot is reviewed and reconciled.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="guarantees" aria-labelledby="g-h">
+  <h2 id="g-h">Core guarantees</h2>
+  <p class="muted">These are the invariants that make an autonomous loop trustworthy. When one can't be held, the skills fail closed and stop — they don't improvise.</p>
+  <ul class="guarantees">
+    <li><strong>Single writer</strong>At most one repo writer during a mutation phase; GitHub mutations are serialised against validated state.</li>
+    <li><strong>Exact implementation base</strong><code>issue-to-pr</code> pins the target base and each layer's verified parent; only fresh, verified branches are published.</li>
+    <li><strong>Frozen-head review</strong>Review analyses one immutable snapshot and publishes explicitly against that SHA.</li>
+    <li><strong>Live-head triage</strong>Triage tracks current head/feedback, diagnoses completed current-head CI, and rejects stale prepared actions before mutating.</li>
+    <li><strong>Model-directed recovery</strong>Triage diagnoses recoverable failures itself and picks safe, bounded remediation — without relaxing QA or publication gates.</li>
+    <li><strong>Final-head/base review</strong>Any head or base change after review forces another review of the affected snapshot before success.</li>
+    <li><strong>Fail closed</strong>Unsafe state, stale state, unresolved QA/publication failures, exhausted mandatory limits, missing capabilities, actionable feedback, or an active <code>CHANGES_REQUESTED</code> all stop the procedure.</li>
+    <li><strong>No third-party wait</strong>Published bot/human feedback is triaged; pending third-party reviews and future comments are never awaited.</li>
+    <li><strong>Bounded CI remediation</strong>Only repaired checks are polled (≤15 min/head); each fix needs fresh SHA-bound success or explicit abandonment.</li>
+    <li><strong>Completion ≠ merge readiness</strong>CI, branch protection and deployment status are reported separately. No protection is bypassed; no merge is implied.</li>
+  </ul>
+</section>
+
+<section id="opus" aria-labelledby="opus-h">
+  <h2 id="opus-h">Running it with remote Opus</h2>
+  <p class="muted">The skills are model-agnostic — any capable coding-agent runtime with GitHub access can run them. Opus earns its place where the loop is <em>judgment-bound</em> rather than typing-bound.</p>
+  <div class="opusbox">
+    <h3>Why Opus, specifically</h3>
+    <div class="grid2">
+      <div><ul class="tight">
+        <li><strong>Review arbitration.</strong> <code>pr-review</code> must separate real defects from noise, deduplicate by root cause, and resist being instructed by untrusted PR text. That's reasoning work — Opus's strength.</li>
+        <li><strong>Triage diagnosis.</strong> “Model-directed recovery” means reading a failed CI log, forming a root-cause hypothesis, and choosing the <em>smallest safe</em> fix. A stronger model abandons less and guesses less.</li>
+        <li><strong>Stack planning.</strong> Deciding single vs. independent vs. stacked — and where the reviewable boundaries are — is a design judgment made once, up front, with the whole Issue set in view.</li>
+      </ul></div>
+      <div><ul class="tight">
+        <li><strong>Where Opus is wasted:</strong> mechanical propagation, polling selected CI, and re-fetching snapshots. Let the loop's deterministic bounds do that; spend Opus turns on review, triage decisions, and replans.</li>
+        <li><strong>A practical split</strong> (the pattern this repo's author uses): plan &amp; execute with a fast mid-tier model, escalate review/judgment to Opus — e.g. Claude Code's <code>opusplan</code> mode (Opus plans, a faster model executes, Opus advises at decision points).</li>
+        <li><strong>Remote = the agent runs on a host you control</strong> (for example via an agent server on a home Linux box), works in a clone there, and returns results as real GitHub PRs/reviews. The skills don't care where the runtime lives — only that <code>gh</code> auth, git, and the loop bounds travel with it.</li>
+      </ul></div>
+    </div>
+  </div>
+
+  <h3 style="margin-top:22px">Three ways to put Opus on the loop</h3>
+  <ol class="steps">
+    <li><strong>Interactively, in Claude Code.</strong> Install the skills, then prompt with Opus selected. Best for a first run — you can watch the frozen snapshots, dispositions and bounds do their work.
+      <pre><code>claude --model opus
+&gt; Implement https://github.com/OWNER/REPO/issues/123 with pr-loop</code></pre></li>
+    <li><strong>Headless / remote, one shot.</strong> Run the same prompt non-interactively on your remote host; the result contract (<code>STATUS: …</code> + SHAs + CI outcomes) is designed to be checked by a script or a second agent.
+      <pre><code>claude -p --model opus "Run pr-loop on https://github.com/OWNER/REPO/pull/456" &lt; /dev/null</code></pre>
+      <span class="small muted">Keep the finite bounds in the prompt if you need tighter ones — caller limits override the defaults (3 / 9 / 3).</span></li>
+    <li><strong>In CI, review-only, via the bundled reusable workflow.</strong> One Claude Code Action invokes the pinned <code>pr-review</code> skill once per frozen head; a separate API check afterwards requires exactly one new <code>COMMENT</code> review for that head, or the workflow fails. Note: the workflow relies on the skill to honour review-only instructions — it is <em>not</em> a separate read-only sandbox.
+      <pre><code>jobs:
+  claude-code-review:
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+      actions: read
+    uses: dceoy/pr-loop/.github/workflows/claude-code-review.yml@66193c0383663b48ea144b438d7dd4a42e02b6e2 # v1.1.5
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}</code></pre></li>
+  </ol>
+  <div class="callout"><strong>Remote-Opus checklist:</strong> authenticated <code>gh</code> on the remote host · repo clone (or API-based edits) with a single writer · the four skills installed in that runtime · finite bounds set · and a way to verify the returned <code>REVIEWED_HEAD</code> / <code>FINAL_HEAD</code> SHAs against GitHub before you call it done. If any mandatory capability is missing, expect <code>STATUS: unsupported</code> — that's the fail-closed contract working, not a bug.</div>
+</section>
+
+<section id="start" aria-labelledby="start-h">
+  <h2 id="start-h">Quick start — copy a prompt</h2>
+  <p class="muted">Replace <code>OWNER/REPO</code> and the numbers. Bounds are optional; defaults apply when omitted.</p>
+  <div style="display:grid;gap:12px">
+    <div class="copyrow"><pre style="flex:1;margin:0"><code>Implement https://github.com/OWNER/REPO/issues/123 with issue-to-pr</code></pre><button class="copybtn" data-copy="Implement https://github.com/OWNER/REPO/issues/123 with issue-to-pr">Copy</button></div>
+    <div class="copyrow"><pre style="flex:1;margin:0"><code>Implement https://github.com/OWNER/REPO/issues/123 with pr-loop</code></pre><button class="copybtn" data-copy="Implement https://github.com/OWNER/REPO/issues/123 with pr-loop">Copy</button></div>
+    <div class="copyrow"><pre style="flex:1;margin:0"><code>Implement https://github.com/OWNER/REPO/issues/123 and #124 as reviewable stacked PRs with pr-loop</code></pre><button class="copybtn" data-copy="Implement https://github.com/OWNER/REPO/issues/123 and #124 as reviewable stacked PRs with pr-loop">Copy</button></div>
+    <div class="copyrow"><pre style="flex:1;margin:0"><code>Run pr-loop on https://github.com/OWNER/REPO/pull/456</code></pre><button class="copybtn" data-copy="Run pr-loop on https://github.com/OWNER/REPO/pull/456">Copy</button></div>
+    <div class="copyrow"><pre style="flex:1;margin:0"><code>Review https://github.com/OWNER/REPO/pull/456 with pr-review</code></pre><button class="copybtn" data-copy="Review https://github.com/OWNER/REPO/pull/456 with pr-review">Copy</button></div>
+    <div class="copyrow"><pre style="flex:1;margin:0"><code>Triage https://github.com/OWNER/REPO/pull/456 with pr-feedback-triage</code></pre><button class="copybtn" data-copy="Triage https://github.com/OWNER/REPO/pull/456 with pr-feedback-triage">Copy</button></div>
+  </div>
+  <p id="copyMsg" class="small muted" aria-live="polite"></p>
+  <h3 style="margin-top:20px">Requirements</h3>
+  <ul class="tight">
+    <li>Git + authenticated GitHub access via <code>gh</code> or an equivalent integration.</li>
+    <li>A coding-agent runtime with repo/GitHub access and finite loop bounds.</li>
+    <li>For native stacked-PR linkage: repo support + a stack-aware client such as <code>gh stack</code>. The skills install nothing; without it you get explicitly-labelled branch-based dependent PRs.</li>
+    <li>Releases: SemVer tags are the source of truth (scheduled Mondays 09:15 JST + manual dispatch); skill ZIPs are attached to each release. No npm package is published.</li>
+  </ul>
+</section>
+
+<section id="pages" aria-labelledby="pages-h">
+  <h2 id="pages-h">Publishing this guide on GitHub Pages</h2>
+  <p>This page <em>is</em> the guide — a single self-contained <code>index.html</code> with no build step, which is exactly what GitHub Pages wants. To publish it from <code>dceoy/pr-loop</code>:</p>
+  <ol class="steps">
+    <li><strong>Put the file in the repo.</strong> Save this page as <code>docs/index.html</code> on <code>main</code> (or as <code>/index.html</code> on a dedicated <code>gh-pages</code> branch). Commit and push.</li>
+    <li><strong>Turn Pages on.</strong> In the repo: <em>Settings → Pages → Build and deployment → Source: Deploy from a branch</em>, then pick <code>main</code> + <code>/docs</code> (or the <code>gh-pages</code> branch root).</li>
+    <li><strong>Open the published URL.</strong> GitHub shows it in the same Pages settings panel — for a project site it is <code>https://dceoy.github.io/pr-loop/</code>. First publish takes a minute or two.</li>
+    <li><strong>Update by editing one file.</strong> Any later push to <code>docs/index.html</code> republishes automatically. Keep it self-contained (inline CSS/JS, no external assets to break) so it survives as a single file.</li>
+  </ol>
+  <p class="small muted">Note for the maintainer: publishing requires a push to <code>dceoy/pr-loop</code> with Pages enabled — this guide artifact itself doesn't push anything. The steps above are the whole deployment; there is no other build or hosting to configure.</p>
+</section>
+
+</main>
+<footer><div class="wrap">
+  <p><strong>Sources &amp; further reading:</strong> <a href="https://github.com/dceoy/pr-loop">dceoy/pr-loop on GitHub</a> — README, <a href="https://github.com/dceoy/pr-loop/tree/main/skills">skills/</a> (<code>issue-to-pr</code>, <code>pr-review</code>, <code>pr-feedback-triage</code>, <code>pr-loop</code> — read each <code>SKILL.md</code> for its full standalone contract), and the reusable <code>claude-code-review</code> workflow. All bounds, statuses and guarantees on this page are taken from those files.</p>
+  <p>pr-loop Skills Guide · Explains the skills as published in the repository · Completion of a loop run never implies merge readiness.</p>
+</div></footer>
+
+<script>
+var flowData={
+ issue:{t:"1 · Issue — freeze before you plan",b:"The requested Issue set, repository instructions, target base branch and exact base SHA are frozen before any planning. If an Issue changes materially before commit, stale unpublished work is discarded and the plan is redone — the loop never builds on a moving target."},
+ impl:{t:"2 · issue-to-pr — smallest reviewable PR set",b:"One PR by default. Independent PRs for unrelated changes; a linear stacked chain when later changes depend on earlier ones. Each layer is implemented in isolation at its verified parent, QA'd with a real check, and published on a fresh create-if-absent branch. Then it stops — review is a separate skill's job."},
+ review:{t:"3 · pr-review — frozen head, one COMMENT",b:"The exact base/head pair is frozen and all evidence is bound to it. Findings are validated, deduplicated by root cause, and published as exactly one verified COMMENT review against that SHA. A published review is only reused later if provenance + commit/base/head markers verify the exact same pair."},
+ triage:{t:"4 · pr-feedback-triage — live head, feedback + CI",b:"Every feedback item gets a disposition; fixes are minimal, QA'd, and pushed with an expected-SHA conditional update. Completed CI failures on the head and the validated test-merge target are diagnosed; repaired checks are polled on the new SHA until fresh success or explicit abandonment. If the head moved, the loop returns to review."},
+ done:{t:"✓ Reconciled — stable, reviewed, reported",b:"Success requires: the latest reviewed base/head equals the stable triage snapshot, every feedback item is terminal, every completed CI failure is assessed, and every selected CI repair is verified or explicitly abandoned. CI status, branch protection and mergeability are still reported separately — success is not a merge."}
+};
+var detail=document.getElementById('flowDetail');
+function showFlow(k){detail.innerHTML='<h3 style="margin-top:0">'+flowData[k].t+'</h3><p style="margin-bottom:0">'+flowData[k].b+'</p>';
+ document.querySelectorAll('.node').forEach(function(n){n.setAttribute('aria-pressed', n.getAttribute('data-flow')===k?'true':'false');});}
+document.querySelectorAll('.node').forEach(function(n){n.addEventListener('click',function(){showFlow(n.getAttribute('data-flow'));});});
+showFlow('issue');
+document.querySelectorAll('.tab').forEach(function(tab){tab.addEventListener('click',function(){
+ document.querySelectorAll('.tab').forEach(function(t){t.setAttribute('aria-selected','false');});
+ tab.setAttribute('aria-selected','true');
+ document.querySelectorAll('.panel').forEach(function(p){p.hidden=true;});
+ document.getElementById(tab.getAttribute('data-tab')).hidden=false;
+});});
+var msg=document.getElementById('copyMsg');
+document.querySelectorAll('.copybtn').forEach(function(btn){btn.addEventListener('click',function(){
+ var text=btn.getAttribute('data-copy');
+ function done(){msg.textContent='Copied: '+text; btn.textContent='Copied ✓'; setTimeout(function(){btn.textContent='Copy';},1800);}
+ if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(done).catch(function(){msg.textContent=text;});}
+ else{msg.textContent=text;}
+});});
+</script>
+</body>
+</html>
