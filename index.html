@@ -318,15 +318,9 @@ footer{padding:28px 0 48px;color:var(--muted);font-size:.92rem}
 </section>
 
 <section id="pages" aria-labelledby="pages-h">
-  <h2 id="pages-h">Publishing this guide on GitHub Pages</h2>
-  <p>This page <em>is</em> the guide — a single self-contained <code>index.html</code> with no build step, which is exactly what GitHub Pages wants. To publish it from <code>dceoy/pr-loop</code>:</p>
-  <ol class="steps">
-    <li><strong>Put the file in the repo.</strong> Save this page as <code>docs/index.html</code> on <code>main</code> (or as <code>/index.html</code> on a dedicated <code>gh-pages</code> branch). Commit and push.</li>
-    <li><strong>Turn Pages on.</strong> In the repo: <em>Settings → Pages → Build and deployment → Source: Deploy from a branch</em>, then pick <code>main</code> + <code>/docs</code> (or the <code>gh-pages</code> branch root).</li>
-    <li><strong>Open the published URL.</strong> GitHub shows it in the same Pages settings panel — for a project site it is <code>https://dceoy.github.io/pr-loop/</code>. First publish takes a minute or two.</li>
-    <li><strong>Update by editing one file.</strong> Any later push to <code>docs/index.html</code> republishes automatically. Keep it self-contained (inline CSS/JS, no external assets to break) so it survives as a single file.</li>
-  </ol>
-  <p class="small muted">Note for the maintainer: publishing requires a push to <code>dceoy/pr-loop</code> with Pages enabled — this guide artifact itself doesn't push anything. The steps above are the whole deployment; there is no other build or hosting to configure.</p>
+  <h2 id="pages-h">Published on GitHub Pages</h2>
+  <p>This guide is live on GitHub Pages at <a href="https://dceoy.github.io/pr-loop/">dceoy.github.io/pr-loop</a>. It is served from the <code>gh-pages</code> branch of <code>dceoy/pr-loop</code>, as the single self-contained <code>index.html</code> at the branch root (commit <code>b15efc9</code>).</p>
+  <p class="small muted">To update the published guide, replace <code>index.html</code> on the <code>gh-pages</code> branch — GitHub Pages republishes it automatically.</p>
 </section>
 
 </main>
